@@ -44,6 +44,10 @@ func (js *JobSpec) Validate() error {
 		if input.Source == "" {
 			return fmt.Errorf("input '%s' source cannot be empty", input.ID)
 		}
+		// Check for duplicate input IDs
+		if availableInputs[input.ID] {
+			return fmt.Errorf("duplicate input ID: '%s'", input.ID)
+		}
 		availableInputs[input.ID] = true
 	}
 
@@ -69,6 +73,10 @@ func (js *JobSpec) Validate() error {
 
 		// Add output as available input for subsequent operations
 		if op.Output != "" {
+			// Check for duplicate operation output IDs
+			if availableInputs[op.Output] {
+				return fmt.Errorf("operation %d (%s): duplicate output ID '%s'", i, op.Op, op.Output)
+			}
 			availableInputs[op.Output] = true
 		}
 	}
