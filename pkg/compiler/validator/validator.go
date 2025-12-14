@@ -37,6 +37,13 @@ func (v *Validator) Validate(spec *schemas.JobSpec) error {
 		if !storage.IsAllowedScheme(scheme) {
 			return fmt.Errorf("input %d (%s): scheme '%s' not allowed", i, input.ID, scheme)
 		}
+
+		// For HTTP/HTTPS URIs, perform SSRF checks
+		if scheme == "http" || scheme == "https" {
+			if err := ValidateHTTPURI(input.Source); err != nil {
+				return fmt.Errorf("input %d (%s): security check failed: %w", i, input.ID, err)
+			}
+		}
 	}
 
 	// Validate output URIs

@@ -71,3 +71,22 @@ func TestValidator_Validate_InvalidScheme(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "scheme 'ftp' not allowed")
 }
+
+func TestValidator_Validate_SSRF_Protection(t *testing.T) {
+	spec := &schemas.JobSpec{
+		Inputs: []schemas.Input{
+			{ID: "video1", Source: "http://127.0.0.1/internal.mp4"},
+		},
+		Operations: []schemas.Operation{
+			{Op: "trim", Input: "video1", Output: "trimmed"},
+		},
+		Outputs: []schemas.Output{
+			{ID: "trimmed", Destination: "file:///tmp/output.mp4"},
+		},
+	}
+
+	validator := New()
+	err := validator.Validate(spec)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "localhost")
+}
