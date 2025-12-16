@@ -26,3 +26,8 @@ go.work.sum
 
 # Worktrees directory
 .worktrees/
+
+# IDEs and editors
+.vscode/
+.idea/
+.claude/
