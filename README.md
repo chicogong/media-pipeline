@@ -2,6 +2,8 @@
 
 A declarative, scalable media processing pipeline built on FFmpeg.
 
+[中文文档](README.zh-CN.md)
+
 ## Overview
 
 Media Pipeline is a production-ready system for processing video and audio at scale. It provides a high-level, declarative API for complex media workflows while leveraging FFmpeg for actual processing.
@@ -161,7 +163,9 @@ media-pipeline/
 
 ### 📋 Next Steps
 
+- **Media Prober** - FFprobe wrapper and parallel probing
 - **Store Module** - Database layer (PostgreSQL/Redis)
+- **Error Handling** - Error taxonomy, FFmpeg parsing, retries
 - **API Server** - RESTful endpoints, authentication, webhooks
 - **Worker Coordination** - Distributed job execution
 - **More Operators** - loudnorm, mix, concat, overlay, etc.
@@ -170,12 +174,13 @@ media-pipeline/
 
 Comprehensive design documents available in `docs/plans/`:
 
-1. [Schemas Detailed Design](docs/plans/schemas-detailed-design.md)
-2. [Planner Module Design](docs/plans/planner-detailed-design.md)
-3. [Operator Interface Design](docs/plans/operator-interface-design.md)
-4. [API Interface Design](docs/plans/api-interface-design.md)
-5. [Distributed State Management](docs/plans/distributed-state-management-design.md)
-6. [Error Handling Design](docs/plans/error-handling-design.md)
+1. [Architecture Design](docs/plans/2025-12-14-media-pipeline-architecture-design.md)
+2. [Schemas Detailed Design](docs/plans/schemas-detailed-design.md)
+3. [Planner Module Design](docs/plans/planner-detailed-design.md)
+4. [Operator Interface Design](docs/plans/operator-interface-design.md)
+5. [API Interface Design](docs/plans/api-interface-design.md)
+6. [Distributed State Management](docs/plans/distributed-state-management-design.md)
+7. [Error Handling Design](docs/plans/error-handling-design.md)
 
 ## Contributing
 
@@ -187,4 +192,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Status**: Core engine complete (60%). Schemas, Operators, Planner, and Executor modules implemented with comprehensive tests. Ready for Store and API implementation.
+**Status**: Core Engine complete (60%). Schemas, Operators, Planner, and Executor modules implemented with comprehensive tests. Ready for media probing, state management, and error handling.

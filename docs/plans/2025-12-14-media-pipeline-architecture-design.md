@@ -143,6 +143,74 @@ User JobSpec (JSON)
 - Supports "plan preview" feature (show execution plan before running)
 - Easy to extend with new operators
 
+### System Overview (Distributed Mode)
+
+```mermaid
+graph LR
+    C[Client] -->|REST/JSON| API[API Server]
+    API -->|enqueue| Q[Job Queue (Redis)]
+    API --> DB[(PostgreSQL)]
+    W1[Worker #1] -.->|claim| Q
+    W2[Worker #2] -.->|claim| Q
+    Q -->|job payload| W1
+    Q -->|job payload| W2
+    subgraph Worker
+      W1 --> PL[Planner]
+      W1 --> EXE[Executor (FFmpeg)]
+      W1 --> ST[Storage (S3/GCS/FS)]
+    end
+    subgraph Worker
+      W2 --> PL2[Planner]
+      W2 --> EXE2[Executor (FFmpeg)]
+      W2 --> ST2[Storage (S3/GCS/FS)]
+    end
+    EXE -->|progress/events| API
+    EXE2 -->|progress/events| API
+    API -->|status/logs| C
+    ST -->|artifacts| Out[Output Bucket]
+    ST2 -->|artifacts| Out
+```
+
+**Notes**:
+- API is stateless; DB holds job state and logs, Redis holds the queue/locks.
+- Workers are symmetric; horizontal scaling is queue-driven.
+- Storage abstraction allows local, S3, or GCS without changing planner/executor.
+
+### Job Lifecycle (Happy Path)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Queue
+    participant Worker
+    participant Prober
+    participant Planner
+    participant Executor
+    participant Storage
+
+    Client->>API: POST /jobs (JobSpec)
+    API->>Queue: Enqueue job metadata
+    Worker-->>Queue: Claim job (lock)
+    Worker->>Prober: ffprobe inputs (parallel)
+    Prober-->>Worker: MediaInfo[]
+    Worker->>Planner: Build DAG, propagate metadata, estimate resources
+    Planner-->>Worker: ProcessingPlan
+    Worker->>Executor: Build FFmpeg command(s)
+    Executor-->>Worker: Command + probes
+    Worker->>Executor: Run FFmpeg (progress pipe)
+    Executor-->>API: Progress events
+    Executor-->>Storage: Write outputs
+    Storage-->>Worker: Upload success
+    Worker-->>API: Final status + logs
+    API-->>Client: 200 OK (completed)
+```
+
+**Key principles**:
+- Probing happens before planning to inform operator validation and graph shaping.
+- Planner is deterministic; Executor can emit intermediate artifacts for debugging.
+- Progress is streamed to API; API persists status/logs for retrieval.
+
 ### Core Components
 
 **1. API Server** (`cmd/api-server`)
@@ -654,70 +722,59 @@ In debug mode:
 
 ## Implementation Roadmap
 
-### Phase 1: Core Infrastructure (Weeks 1-2)
-- [ ] Project structure and Go modules setup
-- [ ] Schemas: JobSpec, ProcessingPlan, JobStatus
-- [ ] Validator: basic type checking and security checks
-- [ ] Storage interface: Local and HTTP implementations
-- [ ] Basic API server (single-process mode)
+### Phase 1: Core Engine (Completed)
+- [x] Project structure and Go modules setup
+- [x] Schemas: JobSpec, ProcessingPlan, JobStatus
+- [x] Operators framework: interface, registry, validation
+- [x] Planner: DAG construction, stages, metadata, estimation
+- [x] Executor: FFmpeg command build and progress parsing
 
-### Phase 2: Compilation Pipeline (Weeks 3-4)
-- [ ] Planner: DAG construction and dependency resolution
-- [ ] Codegen: filtergraph generation
-- [ ] Operator interface and registration
-- [ ] MVP operators: trim, concat, export
+### Phase 2: Media Probing (Weeks 3-4)
+- [ ] FFprobe wrapper (local and remote sources)
+- [ ] MediaInfo parsing from JSON
+- [ ] Parallel probing with concurrency limits
 
-### Phase 3: Execution Engine (Weeks 5-6)
-- [ ] Runner: FFmpeg process management
-- [ ] Progress parsing (-progress pipe:1)
-- [ ] Artifact management (temp files, cleanup)
-- [ ] Error handling and structured errors
+### Phase 3: State Management (Weeks 5-6)
+- [ ] Store: PostgreSQL (jobs, logs, workers)
+- [ ] Queue: Redis priority queue
+- [ ] Locks: Redis-based distributed locks
+- [ ] State machine for job transitions
 
-### Phase 4: Audio Operators (Week 7)
-- [ ] loudnorm (with two-pass support)
-- [ ] mix (basic audio mixing)
-- [ ] volume, silencedetect, silenceremove
+### Phase 4: Error Handling (Week 7)
+- [ ] Error taxonomy and codes
+- [ ] FFmpeg error parsing
+- [ ] Retry and backoff strategy
 
-### Phase 5: Video Operators (Week 8)
-- [ ] crop, scale, pad, rotate
-- [ ] xfade (video transitions)
-- [ ] fps (frame rate conversion)
+### Phase 5: API Layer (Week 8)
+- [ ] HTTP API (create/list/get/cancel jobs, logs, plan)
+- [ ] Authentication and rate limiting
+- [ ] Webhooks with signing and retries
 
-### Phase 6: Graphics Operators (Week 9)
-- [ ] subtitles (burn-in with libass)
-- [ ] overlay (watermarks, picture-in-picture)
-- [ ] drawtext (titles, timestamps)
-
-### Phase 7: Advanced Features (Week 10)
-- [ ] HLS/DASH output
-- [ ] Thumbnail generation
-- [ ] Waveform generation
-- [ ] Presets (podcast, meeting, social video)
-
-### Phase 8: Distributed Mode (Week 11)
+### Phase 6: Worker & Distributed Mode (Week 9)
+- [ ] Worker process and heartbeat
+- [ ] Job claiming and execution pipeline
 - [ ] Queue abstraction (memory, Redis)
-- [ ] Worker implementation
-- [ ] Job persistence (optional database)
+- [ ] Job persistence integration
 
-### Phase 9: Observability (Week 12)
-- [ ] Structured logging
-- [ ] JobLog with metrics
-- [ ] Health check endpoint
-- [ ] Debug mode
+### Phase 7: Observability (Week 10)
+- [ ] Structured logging and tracing
+- [ ] Metrics and health checks
+- [ ] Debug/diagnostic mode
 
-### Phase 10: Testing and Documentation (Weeks 13-14)
+### Phase 8: Operator Expansion (Weeks 11-12)
+- [ ] Audio operators: loudnorm (two-pass), mix, volume, silencedetect
+- [ ] Video operators: crop, pad, rotate, fps
+- [ ] Graphics/composition: overlay, drawtext, subtitles, xfade
+
+### Phase 9: Testing and Documentation (Weeks 13-14)
 - [ ] Comprehensive unit tests
-- [ ] Integration tests
-- [ ] E2E tests with fixtures
-- [ ] API documentation
-- [ ] Operator documentation
+- [ ] Integration/E2E tests with fixtures
+- [ ] Operator and API documentation
 - [ ] Deployment guides
 
-### Phase 11: Polish and Release (Week 15)
-- [ ] Docker images
-- [ ] Kubernetes manifests
-- [ ] Example projects
-- [ ] README with quickstart
+### Phase 10: Polish and Release (Week 15)
+- [ ] Docker images and Kubernetes manifests
+- [ ] Example projects and quickstart README
 - [ ] CONTRIBUTING guide
 - [ ] CI/CD setup
 

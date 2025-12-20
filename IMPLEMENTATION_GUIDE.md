@@ -2,7 +2,9 @@
 
 This guide provides a roadmap for completing the media-pipeline implementation.
 
-## Phase 1: Core Infrastructure ✅ COMPLETED
+**Last Updated**: 2025-12-16
+
+## Phase 1: Core Engine ✅ COMPLETED
 
 ### 1.1 Schemas Package ✅
 **Status**: Complete
@@ -34,41 +36,46 @@ Implemented:
 - `trim` - Trim video/audio to time range
 - `scale` - Scale video resolution with algorithm selection
 
-## Phase 2: Planning and Compilation 🚧 IN PROGRESS
+### 1.4 Planner Module ✅
+**Status**: Complete
+**Files**: `pkg/planner/*.go`
 
-### 2.1 Planner Module 📋 TODO
-**Priority**: High
-**Target**: `pkg/planner/`
+Implemented:
+- DAG construction with cycle detection (`graph.go`)
+- Topological sorting and execution stages (`sort.go`)
+- Metadata propagation (`metadata.go`)
+- Resource estimation (`estimator.go`)
+- Integrated planner (`planner.go`) with tests
 
-Tasks:
-1. **DAG Builder** (`planner/dag.go`)
-   - Build dependency graph from JobSpec
-   - Reference resolution (inputs → operations → outputs)
-   - Cycle detection (DFS algorithm)
-   - Unreachable node detection
+### 1.5 Executor Module ✅
+**Status**: Complete
+**Files**: `pkg/executor/*.go`
 
-2. **Topological Sort** (`planner/sort.go`)
-   - Kahn's algorithm for execution order
-   - Execution stage computation (for parallelization)
+Implemented:
+- FFmpeg command builder from ProcessingPlan (`builder.go`)
+- Process execution with cancellation (`executor.go`)
+- Real-time progress parsing (`progress.go`)
+- Comprehensive tests
 
-3. **Metadata Propagation** (`planner/metadata.go`)
-   - Flow MediaInfo through the graph
-   - Call operator's `ComputeOutputMetadata()`
-   - Update node metadata
+### Core Compilation Flow
 
-4. **Resource Estimator** (`planner/estimator.go`)
-   - Per-node CPU/memory/disk estimation
-   - Total resource calculation
-   - Execution duration prediction
+```mermaid
+flowchart LR
+    A[JobSpec JSON] --> V[Validator<br/>types + security]
+    V --> P[Planner<br/>DAG + metadata + estimates]
+    P --> B[Builder<br/>FFmpeg commands]
+    B --> E[Executor<br/>run + parse progress]
+    subgraph Inputs
+      MI[MediaInfo from ffprobe]
+    end
+    MI -.-> P
+    E --> S[Status/Logs]
+    E --> O[Outputs]
+```
 
-5. **Plan Optimizer** (`planner/optimizer.go`)
-   - Merge linear chains into single FFmpeg command
-   - Identify copy operations (no re-encoding)
-   - Detect parallelizable operations
+## Phase 2: Media Probing 📋 TODO
 
-**Reference**: `docs/plans/planner-detailed-design.md`
-
-### 2.2 Media Prober 📋 TODO
+### 2.1 Media Prober 📋 TODO
 **Priority**: High
 **Target**: `pkg/prober/`
 
@@ -82,32 +89,9 @@ Tasks:
    - Probe multiple inputs concurrently
    - Limit concurrency (max 5 concurrent)
 
-## Phase 3: Execution Engine 📋 TODO
+## Phase 3: State Management 📋 TODO
 
-### 3.1 FFmpeg Executor 📋 TODO
-**Priority**: High
-**Target**: `pkg/executor/`
-
-Tasks:
-1. **Command Builder** (`executor/builder.go`)
-   - Generate FFmpeg commands from ProcessingPlan
-   - Build filtergraph from compiled operators
-   - Handle multi-pass operations (e.g., loudnorm)
-
-2. **Command Executor** (`executor/executor.go`)
-   - Execute FFmpeg commands
-   - Parse progress from stderr
-   - Handle timeouts and cancellation
-   - Capture stdout/stderr for logging
-
-3. **Progress Parser** (`executor/progress.go`)
-   - Parse FFmpeg progress output
-   - Extract frame, fps, time, speed, bitrate
-   - Update job status in real-time
-
-## Phase 4: State Management 📋 TODO
-
-### 4.1 Database Layer 📋 TODO
+### 3.1 Database Layer 📋 TODO
 **Priority**: High
 **Target**: `pkg/store/`
 
@@ -131,7 +115,7 @@ Tasks:
 
 **Reference**: `docs/plans/distributed-state-management-design.md`
 
-### 4.2 Job Queue 📋 TODO
+### 3.2 Job Queue 📋 TODO
 **Priority**: High
 **Target**: `pkg/queue/`
 
@@ -142,7 +126,7 @@ Tasks:
    - Dequeue (pop min score)
    - Peek without removing
 
-### 4.3 Distributed Locks 📋 TODO
+### 3.3 Distributed Locks 📋 TODO
 **Priority**: Medium
 **Target**: `pkg/lock/`
 
@@ -152,9 +136,9 @@ Tasks:
    - Keep-alive mechanism
    - Safe release (Lua script)
 
-## Phase 5: Error Handling 📋 TODO
+## Phase 4: Error Handling 📋 TODO
 
-### 5.1 Error System 📋 TODO
+### 4.1 Error System 📋 TODO
 **Priority**: High
 **Target**: `pkg/errors/`
 
@@ -176,9 +160,9 @@ Tasks:
 
 **Reference**: `docs/plans/error-handling-design.md`
 
-## Phase 6: API Layer 📋 TODO
+## Phase 5: API Layer 📋 TODO
 
-### 6.1 HTTP API 📋 TODO
+### 5.1 HTTP API 📋 TODO
 **Priority**: High
 **Target**: `pkg/api/`
 
@@ -206,7 +190,7 @@ Tasks:
 
 **Reference**: `docs/plans/api-interface-design.md`
 
-### 6.2 API Server 📋 TODO
+### 5.2 API Server 📋 TODO
 **Priority**: High
 **Target**: `cmd/api/`
 
@@ -217,9 +201,9 @@ Tasks:
    - Graceful shutdown
    - Health checks
 
-## Phase 7: Worker Process 📋 TODO
+## Phase 6: Worker Process 📋 TODO
 
-### 7.1 Worker 📋 TODO
+### 6.1 Worker 📋 TODO
 **Priority**: High
 **Target**: `cmd/worker/`
 
@@ -241,9 +225,9 @@ Tasks:
    - Recover orphaned jobs
    - Fail jobs exceeding max retries
 
-## Phase 8: Additional Operators 📋 TODO
+## Phase 7: Additional Operators 📋 TODO
 
-### 8.1 Audio Operators 📋 TODO
+### 7.1 Audio Operators 📋 TODO
 **Target**: `pkg/operators/builtin/`
 
 Operators to implement:
@@ -252,7 +236,7 @@ Operators to implement:
 - `volume` - Volume adjustment
 - `fade` - Audio fade in/out
 
-### 8.2 Video Operators 📋 TODO
+### 7.2 Video Operators 📋 TODO
 **Target**: `pkg/operators/builtin/`
 
 Operators to implement:
@@ -261,7 +245,7 @@ Operators to implement:
 - `fps` - Change frame rate
 - `pad` - Add padding
 
-### 8.3 Composition Operators 📋 TODO
+### 7.3 Composition Operators 📋 TODO
 **Target**: `pkg/operators/builtin/`
 
 Operators to implement:
@@ -319,13 +303,14 @@ func TestTrimOperator(t *testing.T) {
 1. ✅ Schemas (DONE)
 2. ✅ Operators interface (DONE)
 3. ✅ Built-in operators: trim, scale (DONE)
-4. 🚧 **Planner module** ← START HERE
-5. Error handling system
-6. Database layer (PostgreSQL + Redis)
-7. FFmpeg executor
-8. API server
-9. Worker process
-10. Additional operators
+4. ✅ Planner module (DONE)
+5. ✅ FFmpeg executor (DONE)
+6. 📋 Media prober <- NEXT
+7. 📋 State management (PostgreSQL + Redis)
+8. 📋 Error handling system
+9. 📋 API server
+10. 📋 Worker process
+11. 📋 Additional operators
 
 ## Key Dependencies
 

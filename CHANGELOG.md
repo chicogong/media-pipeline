@@ -34,7 +34,9 @@ Total: 31 files, 3,200 lines of code + 1,900 lines of tests
 - ✅ Operators: Complete
 - ✅ Planner: Complete
 - ✅ Executor: Complete
-- 📋 Store (Database): TODO
+- 📋 Media Probing: TODO
+- 📋 State Management: TODO
+- 📋 Error Handling: TODO
 - 📋 API Server: TODO
 
 **Overall**: ~60% complete

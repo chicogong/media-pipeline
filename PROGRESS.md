@@ -28,7 +28,9 @@ Data structures for jobs, plans, metadata, and resource estimates.
 
 ## 📋 TODO
 
-- Database layer (Store)
+- Media prober (ffprobe + parallel probing)
+- State management (store, queue, locks)
+- Error handling system
 - API server
 - Worker coordination
 - Additional operators
