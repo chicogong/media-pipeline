@@ -31,3 +31,6 @@ go.work.sum
 .vscode/
 .idea/
 .claude/
+
+# Local caches (e.g. GOCACHE/GOTMPDIR)
+.cache/

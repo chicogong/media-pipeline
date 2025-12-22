@@ -91,7 +91,10 @@ func (o *ScaleOperator) ComputeOutputMetadata(
 		return nil, fmt.Errorf("scale requires at least one input")
 	}
 
-	output := *inputs[0]
+	input := inputs[0]
+	output := *input
+	output.VideoStreams = append([]schemas.VideoStream(nil), input.VideoStreams...)
+	output.AudioStreams = append([]schemas.AudioStream(nil), input.AudioStreams...)
 
 	converter := operators.NewTypeConverter()
 	width, _ := converter.Convert(params["width"], operators.TypeInt)
@@ -162,8 +165,22 @@ func (o *ScaleOperator) Compile(ctx *operators.CompileContext) (*operators.Compi
 		"neighbor": "neighbor",
 	}[algorithm]
 
-	filter := fmt.Sprintf("[%s]scale=%d:%d:flags=%s[v]",
-		ctx.InputStreams[0].Label, width.(int), height.(int), algorithmFlag)
+	var inputLabel string
+	for _, stream := range ctx.InputStreams {
+		if stream.StreamType == "video" {
+			inputLabel = stream.Label
+			break
+		}
+	}
+	if inputLabel == "" && len(ctx.InputStreams) > 0 {
+		inputLabel = ctx.InputStreams[0].Label
+	}
+	if inputLabel == "" {
+		return nil, fmt.Errorf("scale requires a video input stream")
+	}
+
+	filter := fmt.Sprintf("%sscale=%d:%d:flags=%s[v]",
+		inputLabel, width.(int), height.(int), algorithmFlag)
 
 	return &operators.CompileResult{
 		FilterExpression: filter,

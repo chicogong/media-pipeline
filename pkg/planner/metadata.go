@@ -13,6 +13,17 @@ type MetadataPropagator struct {
 	registry *operators.Registry
 }
 
+func cloneMediaInfo(mi *schemas.MediaInfo) *schemas.MediaInfo {
+	if mi == nil {
+		return nil
+	}
+
+	clone := *mi
+	clone.VideoStreams = append([]schemas.VideoStream(nil), mi.VideoStreams...)
+	clone.AudioStreams = append([]schemas.AudioStream(nil), mi.AudioStreams...)
+	return &clone
+}
+
 // NewMetadataPropagator creates a new metadata propagator
 func NewMetadataPropagator(registry *operators.Registry) *MetadataPropagator {
 	return &MetadataPropagator{
@@ -64,28 +75,28 @@ func (mp *MetadataPropagator) Propagate(ctx context.Context, graph *Graph) error
 			// Store metadata in node
 			node.Metadata = outputMetadata
 
-		case "output":
-			// Output nodes inherit metadata from their predecessor
-			predecessors := graph.GetPredecessors(nodeID)
-			if len(predecessors) == 0 {
-				return fmt.Errorf("output node %s has no predecessors", nodeID)
+			case "output":
+				// Output nodes inherit metadata from their predecessor
+				predecessors := graph.GetPredecessors(nodeID)
+				if len(predecessors) == 0 {
+					return fmt.Errorf("output node %s has no predecessors", nodeID)
 			}
 			if len(predecessors) > 1 {
 				return fmt.Errorf("output node %s has multiple predecessors", nodeID)
 			}
 
 			predNode := predecessors[0]
-			if predNode.Metadata == nil {
-				return fmt.Errorf("output node %s: predecessor %s has no metadata", nodeID, predNode.ID)
+				if predNode.Metadata == nil {
+					return fmt.Errorf("output node %s: predecessor %s has no metadata", nodeID, predNode.ID)
+				}
+
+				// Copy metadata to output node
+				node.Metadata = cloneMediaInfo(predNode.Metadata)
+
+			default:
+				return fmt.Errorf("unknown node type: %s", node.Type)
 			}
-
-			// Copy metadata to output node
-			node.Metadata = predNode.Metadata
-
-		default:
-			return fmt.Errorf("unknown node type: %s", node.Type)
 		}
-	}
 
 	return nil
 }
@@ -102,7 +113,7 @@ func (mp *MetadataPropagator) collectInputMetadata(graph *Graph, node *schemas.P
 		if pred.Metadata == nil {
 			return nil, fmt.Errorf("predecessor %s has no metadata", pred.ID)
 		}
-		inputs = append(inputs, pred.Metadata)
+		inputs = append(inputs, cloneMediaInfo(pred.Metadata))
 	}
 
 	return inputs, nil

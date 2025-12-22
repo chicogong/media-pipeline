@@ -144,11 +144,33 @@ func (o *TrimOperator) EstimateResources(
 func (o *TrimOperator) Compile(ctx *operators.CompileContext) (*operators.CompileResult, error) {
 	converter := operators.NewTypeConverter()
 
-	start, err := converter.Convert(ctx.Params["start"], operators.TypeDuration)
+	startValue, ok := ctx.Params["start"]
+	if !ok {
+		startValue = "00:00:00"
+	}
+	start, err := converter.Convert(startValue, operators.TypeDuration)
 	if err != nil {
 		return nil, err
 	}
 	startDuration := start.(time.Duration)
+
+	var videoInputLabel string
+	var audioInputLabel string
+	for _, stream := range ctx.InputStreams {
+		switch stream.StreamType {
+		case "video":
+			if videoInputLabel == "" {
+				videoInputLabel = stream.Label
+			}
+		case "audio":
+			if audioInputLabel == "" {
+				audioInputLabel = stream.Label
+			}
+		}
+	}
+	if videoInputLabel == "" && audioInputLabel == "" {
+		return nil, fmt.Errorf("trim requires at least one input stream")
+	}
 
 	var filterVideo, filterAudio string
 
@@ -159,19 +181,42 @@ func (o *TrimOperator) Compile(ctx *operators.CompileContext) (*operators.Compil
 		}
 		durationValue := d.(time.Duration)
 
-		filterVideo = fmt.Sprintf("[%s]trim=start=%.3f:duration=%.3f[v]",
-			ctx.InputStreams[0].Label, startDuration.Seconds(), durationValue.Seconds())
-		filterAudio = fmt.Sprintf("[%s]atrim=start=%.3f:duration=%.3f[a]",
-			ctx.InputStreams[0].Label, startDuration.Seconds(), durationValue.Seconds())
+		if videoInputLabel != "" {
+			filterVideo = fmt.Sprintf("%strim=start=%.3f:duration=%.3f[v]",
+				videoInputLabel, startDuration.Seconds(), durationValue.Seconds())
+		}
+		if audioInputLabel != "" {
+			filterAudio = fmt.Sprintf("%satrim=start=%.3f:duration=%.3f[a]",
+				audioInputLabel, startDuration.Seconds(), durationValue.Seconds())
+		}
 	} else {
-		filterVideo = fmt.Sprintf("[%s]trim=start=%.3f[v]",
-			ctx.InputStreams[0].Label, startDuration.Seconds())
-		filterAudio = fmt.Sprintf("[%s]atrim=start=%.3f[a]",
-			ctx.InputStreams[0].Label, startDuration.Seconds())
+		if videoInputLabel != "" {
+			filterVideo = fmt.Sprintf("%strim=start=%.3f[v]",
+				videoInputLabel, startDuration.Seconds())
+		}
+		if audioInputLabel != "" {
+			filterAudio = fmt.Sprintf("%satrim=start=%.3f[a]",
+				audioInputLabel, startDuration.Seconds())
+		}
+	}
+
+	filterExpression := ""
+	outputLabels := []string{}
+
+	if filterVideo != "" {
+		filterExpression = filterVideo
+		outputLabels = append(outputLabels, "[v]")
+	}
+	if filterAudio != "" {
+		if filterExpression != "" {
+			filterExpression += ";"
+		}
+		filterExpression += filterAudio
+		outputLabels = append(outputLabels, "[a]")
 	}
 
 	return &operators.CompileResult{
-		FilterExpression: filterVideo + ";" + filterAudio,
-		OutputLabels:     []string{"[v]", "[a]"},
+		FilterExpression: filterExpression,
+		OutputLabels:     outputLabels,
 	}, nil
 }

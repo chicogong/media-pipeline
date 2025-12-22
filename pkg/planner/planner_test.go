@@ -184,17 +184,17 @@ func TestPlanner_ValidateOperators(t *testing.T) {
 }
 
 func TestPlanner_ValidateParameters(t *testing.T) {
-	// Register trim operator
-	operators.Register(&builtin.TrimOperator{})
+	// Register scale operator
+	operators.Register(&builtin.ScaleOperator{})
 
 	spec := &schemas.JobSpec{
 		Operations: []schemas.Operation{
 			{
-				Op:     "trim",
+				Op:     "scale",
 				Input:  "video",
-				Output: "trimmed",
+				Output: "scaled",
 				Params: map[string]interface{}{
-					// Missing required parameters
+					// Missing required parameters: width, height
 				},
 			},
 		},

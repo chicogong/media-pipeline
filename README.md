@@ -6,17 +6,17 @@ A declarative, scalable media processing pipeline built on FFmpeg.
 
 ## Overview
 
-Media Pipeline is a production-ready system for processing video and audio at scale. It provides a high-level, declarative API for complex media workflows while leveraging FFmpeg for actual processing.
+Media Pipeline is a core engine for building declarative video/audio workflows on top of FFmpeg. The repository currently focuses on schemas, operators, planning, and execution; API/queue/store/worker components are planned.
 
 ### Key Features
 
 - **Declarative API**: Describe what you want, not how to do it
-- **Operator System**: 50+ built-in operators (trim, scale, loudnorm, etc.)
-- **Distributed**: Horizontal scaling with multiple workers
+- **Operator System**: Extensible operator interface (currently: `trim`, `scale`)
+- **Distributed (planned)**: Horizontal scaling with multiple workers
 - **Type-Safe**: Strong parameter validation and type conversion
 - **Extensible**: Add custom operators without modifying core code
-- **Observable**: Comprehensive metrics, tracing, and logging
-- **Reliable**: Automatic retry, failure recovery, error handling
+- **Observable (planned)**: Metrics, tracing, and structured logging
+- **Reliable (planned)**: Retry, failure recovery, and richer error handling
 
 ## Architecture
 
@@ -185,6 +185,14 @@ Comprehensive design documents available in `docs/plans/`:
 ## Contributing
 
 See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for detailed implementation roadmap.
+
+## Testing
+
+Run unit tests:
+
+```bash
+go test ./...
+```
 
 ## License
 

@@ -138,7 +138,7 @@ func Example_complexGraph() {
 	fmt.Printf("Stage 1 (parallel): %v\n", stages[1])
 
 	// Output:
-	// Complex graph has 7 nodes
+	// Complex graph has 8 nodes
 	// Execution in 5 stages
 	// Stage 1 (parallel): [op_0_trim op_1_trim]
 }

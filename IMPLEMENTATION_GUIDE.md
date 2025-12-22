@@ -1,359 +1,287 @@
 # Implementation Guide
 
-This guide provides a roadmap for completing the media-pipeline implementation.
+完整的实施路线图和开发指南。
 
-**Last Updated**: 2025-12-16
+**Last Updated**: 2025-12-22
+**Current Status**: 60% Complete - Core Engine Done
 
-## Phase 1: Core Engine ✅ COMPLETED
+---
 
-### 1.1 Schemas Package ✅
-**Status**: Complete
-**Files**: `pkg/schemas/*.go`
+## 快速导航
 
-Implemented:
-- `Duration` type with multi-format parsing (Go duration, timecode, ISO 8601)
-- `JobSpec` structure (inputs, operations, outputs)
-- `ProcessingPlan` structure (nodes, edges, estimates)
-- `JobStatus` structure (progress tracking)
-- `MediaInfo` structures (video/audio stream metadata)
+- **MVP 上线路线图**: 见 [MVP_ROADMAP.md](MVP_ROADMAP.md) - 详细的 MVP 实施计划
+- **架构设计**: 见 [docs/plans/](docs/plans/) - 完整的设计文档
+- **变更日志**: 见 [CHANGELOG.md](CHANGELOG.md) - 版本历史
 
-### 1.2 Operators Package ✅
-**Status**: Complete
-**Files**: `pkg/operators/*.go`
+---
 
-Implemented:
-- `Operator` interface (6 core methods)
-- Type system (11 parameter types)
-- Parameter validation framework
-- Type converter (automatic type conversion)
-- Registry mechanism (global operator registration)
+## Phase 1: Core Engine ✅ 已完成 (60%)
 
-### 1.3 Built-in Operators ✅
-**Status**: 2 operators implemented
-**Files**: `pkg/operators/builtin/*.go`
+### 已实现模块
 
-Implemented:
-- `trim` - Trim video/audio to time range
-- `scale` - Scale video resolution with algorithm selection
+| 模块 | 文件 | 代码量 | 测试 | 状态 |
+|------|------|--------|------|------|
+| Schemas | `pkg/schemas/` | 400 行 | - | ✅ |
+| Operators | `pkg/operators/` | 800 行 | - | ✅ |
+| Planner | `pkg/planner/` | 1,400 行 | 43 个 | ✅ |
+| Executor | `pkg/executor/` | 600 行 | 14 个 | ✅ |
 
-### 1.4 Planner Module ✅
-**Status**: Complete
-**Files**: `pkg/planner/*.go`
+**核心能力**:
+- 声明式 JobSpec 定义
+- 可扩展的操作符系统（trim, scale）
+- DAG 构建和拓扑排序
+- 元数据传播和资源估算
+- FFmpeg 命令生成和执行
+- 实时进度解析
 
-Implemented:
-- DAG construction with cycle detection (`graph.go`)
-- Topological sorting and execution stages (`sort.go`)
-- Metadata propagation (`metadata.go`)
-- Resource estimation (`estimator.go`)
-- Integrated planner (`planner.go`) with tests
+### 数据流
 
-### 1.5 Executor Module ✅
-**Status**: Complete
-**Files**: `pkg/executor/*.go`
-
-Implemented:
-- FFmpeg command builder from ProcessingPlan (`builder.go`)
-- Process execution with cancellation (`executor.go`)
-- Real-time progress parsing (`progress.go`)
-- Comprehensive tests
-
-### Core Compilation Flow
-
-```mermaid
-flowchart LR
-    A[JobSpec JSON] --> V[Validator<br/>types + security]
-    V --> P[Planner<br/>DAG + metadata + estimates]
-    P --> B[Builder<br/>FFmpeg commands]
-    B --> E[Executor<br/>run + parse progress]
-    subgraph Inputs
-      MI[MediaInfo from ffprobe]
-    end
-    MI -.-> P
-    E --> S[Status/Logs]
-    E --> O[Outputs]
+```
+JobSpec (JSON)
+    ↓
+[Validator] - 参数验证、类型转换
+    ↓
+[Planner] - DAG 构建、元数据传播、资源估算
+    ↓
+[Builder] - 生成 FFmpeg filter_complex 命令
+    ↓
+[Executor] - 执行进程、解析进度
+    ↓
+Output Files + Progress
 ```
 
-## Phase 2: Media Probing 📋 TODO
+---
 
-### 2.1 Media Prober 📋 TODO
-**Priority**: High
-**Target**: `pkg/prober/`
+## Phase 2: MVP 完成 📋 进行中 (40%)
 
-Tasks:
-1. **FFprobe Wrapper** (`prober/ffprobe.go`)
-   - Execute ffprobe on input files
-   - Parse JSON output to MediaInfo
-   - Handle remote files (S3, HTTP)
+**目标**: 实现可运行的单机版服务
 
-2. **Parallel Probing** (`prober/parallel.go`)
-   - Probe multiple inputs concurrently
-   - Limit concurrency (max 5 concurrent)
+详细计划见 [MVP_ROADMAP.md](MVP_ROADMAP.md)
 
-## Phase 3: State Management 📋 TODO
+### 核心任务
 
-### 3.1 Database Layer 📋 TODO
-**Priority**: High
-**Target**: `pkg/store/`
+1. **Media Prober** (10%) - 🔴 最高优先级
+   - ffprobe 包装器
+   - 解析输入文件元数据
+   - 支持本地和远程文件
 
-Tasks:
-1. **PostgreSQL Store** (`store/postgres.go`)
-   - Jobs table CRUD operations
-   - Job logs table
-   - Workers table
-   - Execution steps table
-   - State transitions with transactions
+2. **Store Module** (10%) - 🔴 高优先级
+   - 作业状态存储（内存/SQLite）
+   - CRUD 接口
+   - 进度更新
 
-2. **Redis Store** (`store/redis.go`)
-   - Job queue (sorted sets)
-   - Distributed locks
-   - Caching
+3. **API Server** (10%) - 🔴 高优先级
+   - REST API（提交、查询、取消作业）
+   - HTTP 处理器
+   - 中间件（日志、CORS、认证）
 
-3. **State Machine** (`store/statemachine.go`)
-   - State transition validation
-   - Allowed transitions map
-   - Atomic state updates
+4. **错误处理增强** (5%) - 🟡 中优先级
+   - FFmpeg 错误解析
+   - 错误分类
+   - 重试策略
 
-**Reference**: `docs/plans/distributed-state-management-design.md`
+5. **配置管理** (3%) - 🟡 中优先级
+   - 环境变量和配置文件
+   - FFmpeg 路径、端口等
 
-### 3.2 Job Queue 📋 TODO
-**Priority**: High
-**Target**: `pkg/queue/`
+6. **基础监控** (2%) - 🟢 低优先级
+   - Prometheus metrics
+   - 基础指标
 
-Tasks:
-1. **Priority Queue** (`queue/queue.go`)
-   - Redis sorted sets implementation
-   - Enqueue with priority
-   - Dequeue (pop min score)
-   - Peek without removing
+---
 
-### 3.3 Distributed Locks 📋 TODO
-**Priority**: Medium
-**Target**: `pkg/lock/`
+## Phase 3: 生产级增强 📋 待定 (未来)
 
-Tasks:
-1. **Distributed Lock** (`lock/lock.go`)
-   - Redis SET NX EX implementation
-   - Keep-alive mechanism
-   - Safe release (Lua script)
+### 3.1 分布式状态管理
+**优先级**: 未来
+**参考**: `docs/plans/distributed-state-management-design.md`
 
-## Phase 4: Error Handling 📋 TODO
+- PostgreSQL 数据库层
+- Redis 作业队列
+- 分布式锁
+- 状态机
 
-### 4.1 Error System 📋 TODO
-**Priority**: High
-**Target**: `pkg/errors/`
+### 3.2 Worker 协调
+**优先级**: 未来
 
-Tasks:
-1. **Error Types** (`errors/errors.go`)
-   - ProcessingError structure
-   - Error codes (50+ codes)
-   - Error metadata
+- Worker 注册和心跳
+- 作业分发
+- 故障恢复
+- Watchdog 进程
 
-2. **FFmpeg Parser** (`errors/ffmpeg.go`)
-   - Pattern-based error parsing
-   - 15+ common error patterns
-   - Suggestion generation
+### 3.3 完整错误处理
+**优先级**: 未来
+**参考**: `docs/plans/error-handling-design.md`
 
-3. **Retry Strategy** (`errors/retry.go`)
-   - Retry decision logic
-   - Exponential backoff
-   - Circuit breaker
+- 50+ 错误代码分类
+- FFmpeg 错误解析（15+ 模式）
+- 重试策略（指数退避）
+- 熔断器
 
-**Reference**: `docs/plans/error-handling-design.md`
+### 3.4 高级 API 功能
+**优先级**: 未来
+**参考**: `docs/plans/api-interface-design.md`
 
-## Phase 5: API Layer 📋 TODO
+- JWT 认证
+- 速率限制（令牌桶）
+- Webhook 通知
+- WebSocket 实时更新
 
-### 5.1 HTTP API 📋 TODO
-**Priority**: High
-**Target**: `pkg/api/`
+### 3.5 更多操作符
+**优先级**: 未来
 
-Tasks:
-1. **Handlers** (`api/handlers/`)
-   - `POST /v1/jobs` - Create job
-   - `GET /v1/jobs/{id}` - Get status
-   - `GET /v1/jobs` - List jobs
-   - `DELETE /v1/jobs/{id}` - Cancel job
-   - `GET /v1/jobs/{id}/logs` - Get logs
-   - `GET /v1/jobs/{id}/plan` - Get plan
-   - `GET /v1/operators` - List operators
-   - `GET /v1/operators/{name}` - Operator details
+**音频操作符**:
+- `loudnorm` - EBU R128 响度标准化
+- `mix` - 音频混合
+- `volume`, `fade` - 音量和淡入淡出
 
-2. **Middleware** (`api/middleware/`)
-   - Authentication (API key, JWT)
-   - Rate limiting (token bucket)
-   - Request logging
-   - CORS handling
+**视频操作符**:
+- `crop`, `rotate`, `fps`, `pad`
 
-3. **Webhooks** (`api/webhooks/`)
-   - Webhook sender
-   - HMAC signature
-   - Retry logic
+**合成操作符**:
+- `concat` - 视频拼接
+- `overlay` - 叠加图像/文字
+- `drawtext` - 文字渲染
+- `thumbnail` - 缩略图生成
+- `waveform` - 音频波形
 
-**Reference**: `docs/plans/api-interface-design.md`
+---
 
-### 5.2 API Server 📋 TODO
-**Priority**: High
-**Target**: `cmd/api/`
+## 开发工作流
 
-Tasks:
-1. **Main Server** (`cmd/api/main.go`)
-   - Initialize dependencies (DB, Redis)
-   - Register routes
-   - Graceful shutdown
-   - Health checks
+### 1. 阅读设计文档
+在编码前，先理解模块设计：
+- 架构设计: `docs/plans/2025-12-14-media-pipeline-architecture-design.md`
+- 模块设计: `docs/plans/schemas-detailed-design.md` 等
 
-## Phase 6: Worker Process 📋 TODO
+### 2. TDD 方法
+1. 编写测试用例（`*_test.go`）
+2. 实现功能代码
+3. 运行测试 `go test ./...`
+4. 重构优化
 
-### 6.1 Worker 📋 TODO
-**Priority**: High
-**Target**: `cmd/worker/`
+### 3. 测试策略
 
-Tasks:
-1. **Worker Process** (`cmd/worker/main.go`)
-   - Worker registration
-   - Heartbeat loop (10s interval)
-   - Job processing loop
-   - Graceful shutdown
-
-2. **Job Executor** (`cmd/worker/executor.go`)
-   - Job claiming (atomic DB update)
-   - Execute phases: validation → planning → download → process → upload
-   - Progress updates
-   - Error handling
-
-3. **Watchdog** (`cmd/worker/watchdog.go`)
-   - Detect stale workers (30s timeout)
-   - Recover orphaned jobs
-   - Fail jobs exceeding max retries
-
-## Phase 7: Additional Operators 📋 TODO
-
-### 7.1 Audio Operators 📋 TODO
-**Target**: `pkg/operators/builtin/`
-
-Operators to implement:
-- `loudnorm` - EBU R128 loudness normalization (two-pass)
-- `mix` - Audio mixing with ducking
-- `volume` - Volume adjustment
-- `fade` - Audio fade in/out
-
-### 7.2 Video Operators 📋 TODO
-**Target**: `pkg/operators/builtin/`
-
-Operators to implement:
-- `crop` - Crop video
-- `rotate` - Rotate video
-- `fps` - Change frame rate
-- `pad` - Add padding
-
-### 7.3 Composition Operators 📋 TODO
-**Target**: `pkg/operators/builtin/`
-
-Operators to implement:
-- `concat` - Concatenate videos
-- `overlay` - Overlay images/text
-- `drawtext` - Draw text on video
-- `thumbnail` - Generate thumbnails
-- `waveform` - Generate audio waveform
-
-## Testing Strategy
-
-### Unit Tests
-- All packages should have `*_test.go` files
-- Test core logic in isolation
-- Mock external dependencies (DB, Redis, S3)
-
-### Integration Tests
-- Test full job execution flow
-- Use Docker Compose for dependencies
-- Test with real media files
-
-### Example Test Structure
-
+**单元测试**:
 ```go
 func TestTrimOperator(t *testing.T) {
     op := &builtin.TrimOperator{}
-
     params := map[string]interface{}{
-        "start":    "00:00:10",
+        "start": "00:00:10",
         "duration": "00:05:00",
     }
-
     err := op.ValidateParams(params)
     assert.NoError(t, err)
-
-    // Test metadata computation
-    input := &schemas.MediaInfo{Duration: 600.0}
-    output, err := op.ComputeOutputMetadata(params, []*schemas.MediaInfo{input})
-    assert.NoError(t, err)
-    assert.Equal(t, 300.0, output.Duration)
 }
 ```
 
-## Development Workflow
+**集成测试**:
+- 完整作业流程
+- 真实媒体文件
+- 错误场景
 
-1. **Read Design Docs**: Understand the module's design before coding
-2. **Write Tests First**: TDD approach for core logic
-3. **Implement**: Follow the design spec closely
-4. **Test**: Run unit and integration tests
-5. **Document**: Add inline comments and examples
-6. **Review**: Self-review code quality
+**端到端测试**:
+- API → Prober → Planner → Executor
+- 真实 FFmpeg 执行
+- 进度跟踪验证
 
-## Recommended Implementation Order
+### 4. 代码质量
+- 所有公共函数有文档注释
+- 错误处理完善
+- 日志输出清晰
+- 避免魔法数字
 
-1. ✅ Schemas (DONE)
-2. ✅ Operators interface (DONE)
-3. ✅ Built-in operators: trim, scale (DONE)
-4. ✅ Planner module (DONE)
-5. ✅ FFmpeg executor (DONE)
-6. 📋 Media prober <- NEXT
-7. 📋 State management (PostgreSQL + Redis)
-8. 📋 Error handling system
-9. 📋 API server
-10. 📋 Worker process
-11. 📋 Additional operators
+---
 
-## Key Dependencies
+## 依赖管理
 
+### 当前依赖
 ```bash
+# 已在 go.mod
 go get github.com/google/uuid
-go get github.com/lib/pq                    # PostgreSQL driver
-go get github.com/redis/go-redis/v9         # Redis client
-go get github.com/gorilla/mux               # HTTP router
+```
+
+### MVP 所需依赖
+```bash
+# HTTP 路由
+go get github.com/gorilla/mux
+
+# SQLite（可选，用于 Store）
+go get github.com/mattn/go-sqlite3
+```
+
+### 未来依赖（生产级）
+```bash
+# 数据库
+go get github.com/lib/pq                    # PostgreSQL
+go get github.com/redis/go-redis/v9         # Redis
+
+# 监控
 go get github.com/prometheus/client_golang  # Metrics
 go get go.opentelemetry.io/otel            # Tracing
 ```
 
-## Configuration
+---
 
-Create `internal/config/config.go`:
+## 配置管理
+
+创建 `internal/config/config.go`:
 
 ```go
 type Config struct {
-    Database DatabaseConfig
-    Redis    RedisConfig
-    Storage  StorageConfig
+    Server   ServerConfig
     FFmpeg   FFmpegConfig
+    Storage  StorageConfig
+    Database DatabaseConfig  // MVP 可选
 }
 
-type DatabaseConfig struct {
-    Host     string
-    Port     int
-    Database string
-    User     string
-    Password string
+type ServerConfig struct {
+    Host string `env:"HOST" default:"0.0.0.0"`
+    Port int    `env:"PORT" default:"8080"`
 }
 
-type RedisConfig struct {
-    Host     string
-    Port     int
-    Password string
+type FFmpegConfig struct {
+    BinPath string `env:"FFMPEG_PATH" default:"ffmpeg"`
+    TempDir string `env:"TEMP_DIR" default:"/tmp"`
+}
+
+type StorageConfig struct {
+    Type   string `env:"STORAGE_TYPE" default:"memory"` // memory|sqlite|s3
+    Path   string `env:"STORAGE_PATH" default:"./data"`
 }
 ```
 
-## Deployment
+---
 
-### Docker Compose (Development)
+## 部署
 
+### MVP 单机部署
+
+**Dockerfile**:
+```dockerfile
+FROM golang:1.21 AS builder
+WORKDIR /app
+COPY go.* ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o api cmd/api/main.go
+
+FROM alpine:latest
+RUN apk add --no-cache ffmpeg
+COPY --from=builder /app/api /usr/local/bin/
+EXPOSE 8080
+CMD ["api"]
+```
+
+**运行**:
+```bash
+docker build -t media-pipeline:mvp .
+docker run -p 8080:8080 media-pipeline:mvp
+```
+
+### 生产级部署（未来）
+
+**docker-compose.yml**:
 ```yaml
 version: '3.8'
 services:
@@ -383,28 +311,63 @@ services:
   worker:
     build: .
     command: /app/worker
+    deploy:
+      replicas: 3
     depends_on:
       - postgres
       - redis
 ```
 
-## Success Criteria
+---
 
-A successful implementation should:
+## 成功标准
 
-1. ✅ Accept JobSpec via REST API
-2. ✅ Validate parameters using operator schemas
-3. ✅ Build DAG and detect cycles
-4. ✅ Estimate resources before execution
-5. ✅ Generate FFmpeg commands
-6. ✅ Execute jobs on workers
-7. ✅ Track progress in real-time
-8. ✅ Handle failures and retry
-9. ✅ Send webhook notifications
-10. ✅ Provide detailed logs and metrics
+### MVP 阶段（当前目标）
+- ✅ 通过 REST API 提交 trim+scale 作业
+- ✅ 查询作业状态和进度
+- ✅ FFmpeg 执行成功
+- ✅ 错误有明确提示
+- ✅ 一条命令启动服务
+
+### 生产级阶段（未来）
+- ✅ 水平扩展多个 Worker
+- ✅ 作业自动重试
+- ✅ Webhook 通知
+- ✅ Prometheus 指标
+- ✅ 分布式追踪
+- ✅ 50+ 内置操作符
 
 ---
 
-**Current Status**: Core infrastructure complete. Ready to implement Planner module.
+## 推荐实施顺序
 
-**Next Step**: Implement `pkg/planner/` following the design in `docs/plans/planner-detailed-design.md`
+1. ✅ **Schemas** - 数据结构（已完成）
+2. ✅ **Operators** - 操作符接口（已完成）
+3. ✅ **Planner** - DAG 规划器（已完成）
+4. ✅ **Executor** - FFmpeg 执行器（已完成）
+5. 🔄 **Media Prober** - 元数据探测（当前）
+6. 📋 **Store** - 状态存储
+7. 📋 **API Server** - REST 接口
+8. 📋 **Error Handling** - 错误处理增强
+9. 📋 **Configuration** - 配置管理
+10. 📋 **Deployment** - Docker 打包
+
+**详细的 MVP 任务分解**: 见 [MVP_ROADMAP.md](MVP_ROADMAP.md)
+
+---
+
+## 文档索引
+
+- [MVP 上线路线图](MVP_ROADMAP.md) - MVP 实施计划
+- [变更日志](CHANGELOG.md) - 版本历史
+- [架构设计](docs/plans/2025-12-14-media-pipeline-architecture-design.md) - 系统架构
+- [Schemas 设计](docs/plans/schemas-detailed-design.md) - 数据结构
+- [Planner 设计](docs/plans/planner-detailed-design.md) - 规划器
+- [Operator 设计](docs/plans/operator-interface-design.md) - 操作符接口
+- [API 设计](docs/plans/api-interface-design.md) - REST API
+- [状态管理设计](docs/plans/distributed-state-management-design.md) - 分布式状态
+- [错误处理设计](docs/plans/error-handling-design.md) - 错误处理
+
+---
+
+**下一步**: 开始实施 Media Prober - 见 [MVP_ROADMAP.md](MVP_ROADMAP.md#phase-2-media-prober-第一优先级)

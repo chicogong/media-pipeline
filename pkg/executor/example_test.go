@@ -70,7 +70,7 @@ func ExampleExecutor() {
 	fmt.Printf("Command: %s\n", cmd.Args[0])
 
 	// Output:
-	// FFmpeg command built with 7 arguments
+	// FFmpeg command built with 8 arguments
 	// Command: ffmpeg
 }
 
@@ -122,6 +122,7 @@ func ExampleExecutor_withProgress() {
 	// Note: Actual execution would require FFmpeg to be installed
 	// err := exec.Execute(context.Background(), plan, opts)
 
+	_, _ = plan, exec
 	_ = opts
 	fmt.Println("Executor configured with callbacks")
 
@@ -170,5 +171,5 @@ func ExampleCommandBuilder() {
 
 	// Output:
 	// Command: ffmpeg
-	// Total arguments: 7
+	// Total arguments: 10
 }
