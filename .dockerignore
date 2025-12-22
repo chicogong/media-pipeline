@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE and editors
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+.github/
+
+# Test files
+*_test.go
+testdata/
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Data directories
+data/
+uploads/
+outputs/
+temp/
+*.mp4
+*.mp3
+*.wav
+*.avi
+*.mov
+*.mkv
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies (will be downloaded during build)
+vendor/
+
+# Other
+*.log
+*.tmp
+.env
+.env.*

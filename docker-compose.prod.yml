@@ -1,0 +1,162 @@
+version: '3.8'
+
+# Production Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  # API Server - Production Configuration
+  api:
+    restart: always
+
+    # Resource limits
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+    # Production environment variables
+    environment:
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - METRICS_ENABLED=true
+      - AUTO_CLEANUP=true
+      - MAX_CONCURRENT_JOBS=10
+
+    # Use environment file for secrets
+    env_file:
+      - .env.prod
+
+    # Enhanced health check
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service,environment"
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Read-only root filesystem (except mounted volumes)
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/temp
+
+  # Redis - Production Configuration
+  redis:
+    restart: always
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # Production command with persistence
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL - Production Configuration
+  postgres:
+    restart: always
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+    # Use secrets for sensitive data
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+
+    secrets:
+      - postgres_password
+
+    # Production PostgreSQL configuration
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c maintenance_work_mem=256MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=10MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Secrets for sensitive data
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+
+# Production volumes with backup configuration
+volumes:
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/lib/media-pipeline/redis
+      o: bind
+
+  postgres-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/lib/media-pipeline/postgres
+      o: bind

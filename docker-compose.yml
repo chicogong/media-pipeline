@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Media Pipeline API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: media-pipeline-api:latest
+    container_name: media-pipeline-api
+    ports:
+      - "8081:8080"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      # Redis connection (for future use)
+      - REDIS_URL=redis://redis:6379
+      # PostgreSQL connection (for future use)
+      - DATABASE_URL=postgresql://media:media123@postgres:5432/media_pipeline?sslmode=disable
+    volumes:
+      # Mount directories for media files
+      - ./data/uploads:/app/uploads
+      - ./data/outputs:/app/outputs
+      - ./data/temp:/app/temp
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - media-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Redis for caching and job queue (future enhancement)
+  redis:
+    image: redis:7-alpine
+    container_name: media-pipeline-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - media-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for production database (future enhancement)
+  postgres:
+    image: postgres:15-alpine
+    container_name: media-pipeline-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=media
+      - POSTGRES_PASSWORD=media123
+      - POSTGRES_DB=media_pipeline
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - media-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  media-network:
+    driver: bridge
