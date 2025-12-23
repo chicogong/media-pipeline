@@ -20,35 +20,125 @@ Media Pipeline is a core engine for building declarative video/audio workflows o
 
 ## Architecture
 
+### System Architecture
+
+```mermaid
+graph TB
+    Client[Client Application]
+    API[REST API Server]
+    Store[(In-Memory Store)]
+    Redis[(Redis Cache)]
+    Postgres[(PostgreSQL DB)]
+
+    subgraph "Processing Pipeline"
+        Prober[Media Prober<br/>FFprobe]
+        Planner[Planner<br/>DAG Builder]
+        Executor[Executor<br/>FFmpeg]
+    end
+
+    subgraph "Storage Layer"
+        Uploads[/Uploads/]
+        Outputs[/Outputs/]
+        Temp[/Temp Files/]
+    end
+
+    Client -->|HTTP POST /jobs| API
+    Client -->|HTTP GET /jobs/:id| API
+    API --> Store
+    API -.->|Future| Redis
+    API -.->|Future| Postgres
+
+    API --> Prober
+    Prober --> Planner
+    Planner --> Executor
+
+    Executor --> Uploads
+    Executor --> Temp
+    Executor --> Outputs
+
+    style API fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style Prober fill:#2196F3,stroke:#333,stroke-width:2px,color:#fff
+    style Planner fill:#2196F3,stroke:#333,stroke-width:2px,color:#fff
+    style Executor fill:#2196F3,stroke:#333,stroke-width:2px,color:#fff
 ```
-┌─────────────┐
-│ REST API    │  JobSpec submission, status queries
-└─────────────┘
-       │
-       ▼
-┌─────────────┐
-│  Validator  │  Parameter validation, SSRF protection
-└─────────────┘
-       │
-       ▼
-┌─────────────┐
-│   Planner   │  DAG construction, resource estimation
-└─────────────┘
-       │
-       ▼
-┌─────────────┐
-│ Job Queue   │  Priority scheduling (Redis)
-└─────────────┘
-       │
-       ▼
-┌─────────────┐
-│   Workers   │  FFmpeg execution, progress tracking
-└─────────────┘
-       │
-       ▼
-┌─────────────┐
-│   Storage   │  S3/GCS output upload
-└─────────────┘
+
+### Job Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API Server
+    participant S as Store
+    participant Pr as Prober
+    participant Pl as Planner
+    participant E as Executor
+
+    C->>A: POST /api/v1/jobs<br/>{JobSpec}
+    A->>S: CreateJob(job)
+    S-->>A: job_id
+    A-->>C: 201 Created<br/>{job_id, status: pending}
+
+    Note over A: Background Processing
+    A->>S: UpdateStatus(validating)
+    A->>Pr: Probe(input_files)
+    Pr-->>A: MediaInfo
+
+    A->>S: UpdateStatus(planning)
+    A->>Pl: Plan(JobSpec, MediaInfo)
+    Pl-->>A: ProcessingPlan (DAG)
+
+    A->>S: UpdateStatus(processing)
+    A->>E: Execute(ProcessingPlan)
+
+    loop Progress Updates
+        E-->>A: Progress{frame, fps, bitrate}
+        A->>S: UpdateProgress(percent)
+    end
+
+    E-->>A: Success
+    A->>S: UpdateStatus(completed)
+
+    C->>A: GET /api/v1/jobs/{id}
+    A->>S: GetJob(id)
+    S-->>A: JobStatus
+    A-->>C: 200 OK<br/>{status, progress}
+```
+
+### Job State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Job Created
+
+    Pending --> Validating: Start Processing
+    Validating --> Planning: Validation OK
+    Validating --> Failed: Validation Error
+
+    Planning --> Processing: Plan Created
+    Planning --> Failed: Planning Error
+
+    Processing --> Completed: Success
+    Processing --> Failed: Execution Error
+    Processing --> Cancelled: User Cancelled
+
+    Completed --> [*]
+    Failed --> [*]
+    Cancelled --> [*]
+
+    note right of Validating
+        Check JobSpec syntax,
+        validate parameters
+    end note
+
+    note right of Planning
+        Build DAG,
+        estimate resources
+    end note
+
+    note right of Processing
+        Execute FFmpeg,
+        track progress
+    end note
 ```
 
 ## Quick Start
@@ -95,6 +185,27 @@ make run
 ```
 
 ### Example: Trim and Scale Video
+
+#### Processing DAG
+
+```mermaid
+graph LR
+    Input[Input Video<br/>input.mp4]
+    Trim[Trim Operator<br/>10s - 5min]
+    Scale[Scale Operator<br/>1280x720]
+    Output[Output Video<br/>output.mp4]
+
+    Input --> Trim
+    Trim --> Scale
+    Scale --> Output
+
+    style Input fill:#FFC107,stroke:#333,stroke-width:2px
+    style Trim fill:#2196F3,stroke:#333,stroke-width:2px,color:#fff
+    style Scale fill:#2196F3,stroke:#333,stroke-width:2px,color:#fff
+    style Output fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+```
+
+#### Job Specification
 
 ```json
 {

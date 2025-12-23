@@ -116,28 +116,92 @@ curl -X POST http://localhost:8080/api/v1/jobs \
 
 ### Architecture
 
+#### Docker Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "Host Machine"
+        Client[Client<br/>HTTP Requests]
+        Volumes[Volume Mounts<br/>./data/uploads<br/>./data/outputs<br/>./data/temp]
+    end
+
+    subgraph "Docker Network: media-network"
+        subgraph "API Container"
+            API[API Server<br/>Go + FFmpeg<br/>Port: 8080]
+            Prober[Media Prober]
+            Planner[Planner]
+            Executor[Executor]
+        end
+
+        subgraph "Redis Container"
+            Redis[(Redis<br/>Port: 6379<br/>Cache & Queue)]
+        end
+
+        subgraph "PostgreSQL Container"
+            Postgres[(PostgreSQL<br/>Port: 5432<br/>Job Database)]
+        end
+
+        subgraph "Persistent Storage"
+            RedisData[(redis-data<br/>volume)]
+            PostgresData[(postgres-data<br/>volume)]
+        end
+    end
+
+    Client -->|HTTP :8081| API
+    API --> Redis
+    API --> Postgres
+    API <--> Volumes
+
+    Redis --> RedisData
+    Postgres --> PostgresData
+
+    API --> Prober
+    Prober --> Planner
+    Planner --> Executor
+
+    style API fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style Redis fill:#DC382D,stroke:#333,stroke-width:2px,color:#fff
+    style Postgres fill:#336791,stroke:#333,stroke-width:2px,color:#fff
+    style Volumes fill:#FFC107,stroke:#333,stroke-width:2px
 ```
-┌─────────────────────────────────────────────────┐
-│                Docker Network                    │
-│                                                  │
-│  ┌────────────┐    ┌────────────┐              │
-│  │   Redis    │    │ PostgreSQL │              │
-│  │  (Cache)   │    │ (Database) │              │
-│  └─────┬──────┘    └─────┬──────┘              │
-│        │                  │                      │
-│        └────────┬─────────┘                      │
-│                 │                                │
-│         ┌───────▼────────┐                      │
-│         │   API Server   │                      │
-│         │   (Go + FFmpeg)│                      │
-│         └───────┬────────┘                      │
-│                 │                                │
-└─────────────────┼────────────────────────────────┘
-                  │
-          ┌───────▼────────┐
-          │   Port 8080    │
-          │  (HTTP API)    │
-          └────────────────┘
+
+#### Service Health Check Flow
+
+```mermaid
+sequenceDiagram
+    participant D as Docker Engine
+    participant A as API Container
+    participant R as Redis Container
+    participant P as PostgreSQL Container
+
+    Note over D: Container Startup
+
+    D->>R: Start Redis
+    loop Every 10s
+        D->>R: redis-cli ping
+        R-->>D: PONG
+    end
+    Note over R: Status: Healthy
+
+    D->>P: Start PostgreSQL
+    loop Every 10s
+        D->>P: pg_isready
+        P-->>D: accepting connections
+    end
+    Note over P: Status: Healthy
+
+    Note over D: Wait for dependencies
+
+    D->>A: Start API Server
+    Note over A: Wait for Redis & PostgreSQL
+
+    loop Every 30s
+        D->>A: wget /health
+        A-->>D: {"status":"healthy"}
+    end
+    Note over A: Status: Healthy
+
+    Note over D,A: All Services Ready
 ```
 
 ### Service Details
@@ -329,6 +393,74 @@ networks:
 ```
 
 ## Production Setup
+
+### Production Architecture
+
+```mermaid
+graph TB
+    subgraph "Load Balancer / Reverse Proxy"
+        LB[Nginx/Traefik<br/>HTTPS :443]
+    end
+
+    subgraph "Application Layer"
+        API1[API Instance 1<br/>:8080]
+        API2[API Instance 2<br/>:8080]
+        API3[API Instance 3<br/>:8080]
+    end
+
+    subgraph "Data Layer"
+        Redis[(Redis Cluster<br/>AOF Persistence)]
+        Postgres[(PostgreSQL<br/>Replication)]
+    end
+
+    subgraph "Storage Layer"
+        NFS[NFS/Network Storage<br/>Shared Media Files]
+        S3[S3/Object Storage<br/>Archive & Backup]
+    end
+
+    subgraph "Monitoring"
+        Prometheus[Prometheus<br/>Metrics]
+        Grafana[Grafana<br/>Dashboards]
+        Loki[Loki<br/>Log Aggregation]
+    end
+
+    Internet([Internet]) --> LB
+    LB --> API1
+    LB --> API2
+    LB --> API3
+
+    API1 --> Redis
+    API2 --> Redis
+    API3 --> Redis
+
+    API1 --> Postgres
+    API2 --> Postgres
+    API3 --> Postgres
+
+    API1 <--> NFS
+    API2 <--> NFS
+    API3 <--> NFS
+
+    API1 -.->|Archive| S3
+    API2 -.->|Archive| S3
+    API3 -.->|Archive| S3
+
+    API1 --> Prometheus
+    API2 --> Prometheus
+    API3 --> Prometheus
+
+    Prometheus --> Grafana
+    API1 --> Loki
+    API2 --> Loki
+    API3 --> Loki
+
+    style LB fill:#FF9800,stroke:#333,stroke-width:2px,color:#fff
+    style API1 fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style API2 fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style API3 fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style Redis fill:#DC382D,stroke:#333,stroke-width:2px,color:#fff
+    style Postgres fill:#336791,stroke:#333,stroke-width:2px,color:#fff
+```
 
 ### Security Hardening
 
