@@ -264,27 +264,36 @@ graph LR
 
 ```
 media-pipeline/
-├── cmd/api/          # API server entry point
+├── cmd/api/              # API server entry point
 ├── pkg/
-│   ├── schemas/      # JobSpec, ProcessingPlan, MediaInfo
-│   ├── operators/    # Operator interface + built-in operators (trim, scale)
-│   ├── planner/      # DAG builder and resource estimator
-│   ├── executor/     # FFmpeg command builder and runner
-│   ├── prober/       # FFprobe media metadata extraction
-│   ├── store/        # In-memory job storage (thread-safe)
-│   └── api/          # HTTP handlers and middleware
-└── docs/plans/       # Design documents
+│   ├── schemas/          # JobSpec, ProcessingPlan, MediaInfo
+│   ├── operators/        # Operator interface + built-in operators (trim, scale)
+│   ├── planner/          # DAG builder and resource estimator
+│   ├── executor/         # FFmpeg command builder and runner
+│   ├── prober/           # FFprobe media metadata extraction
+│   ├── storage/          # 🆕 Storage abstraction (local, HTTP/HTTPS)
+│   ├── compiler/
+│   │   └── validator/    # 🆕 Input validation + SSRF protection
+│   ├── store/            # In-memory job storage (thread-safe)
+│   └── api/              # HTTP handlers and middleware
+└── docs/plans/           # Design documents
 ```
 
 ## Status
 
-**✅ MVP Complete (100%)** - Production-ready with full test coverage (>70% across all modules)
+**✅ MVP Complete + Security Enhancements** - Production-ready with security hardening
 
 **Core Modules**:
-- Schemas, Operators (trim, scale), Planner, Executor, Prober, Store, API Server
-- Docker deployment with Redis & PostgreSQL
-- REST API with real-time progress tracking
-- Comprehensive test suite (43+ tests, 3,600+ lines)
+- **Schemas** - JobSpec, ProcessingPlan, JobStatus with validation
+- **Operators** - trim, scale + extensible framework
+- **Planner** - DAG builder with resource estimation
+- **Executor** - FFmpeg command generation & execution
+- **Prober** - Media metadata extraction via FFprobe
+- **Storage** - Unified file abstraction (local, HTTP/HTTPS) 🆕
+- **Validator** - Input validation + SSRF protection 🆕
+- **Store** - In-memory job storage
+- **API Server** - REST API with real-time progress
+- **Docker** - Multi-service deployment ready
 
 **Future Enhancements**:
 - Authentication & Authorization (API keys, JWT, RBAC)

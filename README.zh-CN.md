@@ -264,27 +264,36 @@ graph LR
 
 ```
 media-pipeline/
-├── cmd/api/          # API 服务器入口
+├── cmd/api/              # API 服务器入口
 ├── pkg/
-│   ├── schemas/      # JobSpec、ProcessingPlan、MediaInfo
-│   ├── operators/    # 算子接口 + 内置算子（trim、scale）
-│   ├── planner/      # DAG 构建与资源估算
-│   ├── executor/     # FFmpeg 命令构建与执行
-│   ├── prober/       # FFprobe 媒体元数据提取
-│   ├── store/        # 内存任务存储（线程安全）
-│   └── api/          # HTTP handlers 与中间件
-└── docs/plans/       # 设计文档
+│   ├── schemas/          # JobSpec、ProcessingPlan、MediaInfo
+│   ├── operators/        # 算子接口 + 内置算子（trim、scale）
+│   ├── planner/          # DAG 构建与资源估算
+│   ├── executor/         # FFmpeg 命令构建与执行
+│   ├── prober/           # FFprobe 媒体元数据提取
+│   ├── storage/          # 🆕 存储抽象（本地、HTTP/HTTPS）
+│   ├── compiler/
+│   │   └── validator/    # 🆕 输入验证 + SSRF 防护
+│   ├── store/            # 内存任务存储（线程安全）
+│   └── api/              # HTTP handlers 与中间件
+└── docs/plans/           # 设计文档
 ```
 
 ## 实现状态
 
-**✅ MVP 完成（100%）** - 生产就绪，全模块测试覆盖率 >70%
+**✅ MVP 完成 + 安全增强** - 生产就绪，已加固安全性
 
 **核心模块**：
-- Schemas、Operators（trim、scale）、Planner、Executor、Prober、Store、API Server
-- Docker 部署（Redis & PostgreSQL）
-- REST API 与实时进度追踪
-- 完整测试套件（43+ 测试，3,600+ 行）
+- **Schemas** - JobSpec、ProcessingPlan、JobStatus（含验证）
+- **Operators** - trim、scale + 可扩展框架
+- **Planner** - DAG 构建与资源估算
+- **Executor** - FFmpeg 命令生成与执行
+- **Prober** - 媒体元数据提取
+- **Storage** - 统一文件抽象（本地、HTTP/HTTPS）🆕
+- **Validator** - 输入验证 + SSRF 防护 🆕
+- **Store** - 内存任务存储
+- **API Server** - REST API 与实时进度
+- **Docker** - 多服务部署就绪
 
 **未来增强**：
 - 认证与授权（API 密钥、JWT、RBAC）
