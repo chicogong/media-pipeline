@@ -1,5 +1,10 @@
 # Media Pipeline
 
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-6.0+-007808?style=flat&logo=ffmpeg)](https://ffmpeg.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A declarative, scalable media processing pipeline built on FFmpeg.
 
 [中文文档](README.zh-CN.md) | [Examples](EXAMPLES.md) | [Deployment Guide](DEPLOYMENT.md)

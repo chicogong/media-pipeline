@@ -1,5 +1,10 @@
 # Media Pipeline（中文）
 
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-6.0+-007808?style=flat&logo=ffmpeg)](https://ffmpeg.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 基于 FFmpeg 的声明式、可扩展媒体处理流水线。
 
 [English](README.md) | [示例文档](EXAMPLES.md) | [部署指南](DEPLOYMENT.md)
