@@ -1,6 +1,9 @@
 package schemas
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // JobSpec is the user-submitted job specification
 type JobSpec struct {
@@ -86,4 +89,69 @@ type ResourceLimits struct {
 	MaxResolution string    `json:"max_resolution,omitempty"`
 	MaxOutputSize int64     `json:"max_output_size,omitempty"`
 	MaxMemory     int64     `json:"max_memory,omitempty"`
+}
+
+// Validate checks if the JobSpec is valid
+func (js *JobSpec) Validate() error {
+	// Build a map of available inputs (initially just the inputs array)
+	availableInputs := make(map[string]bool)
+	for _, input := range js.Inputs {
+		if input.ID == "" {
+			return fmt.Errorf("input ID cannot be empty")
+		}
+		if input.Source == "" {
+			return fmt.Errorf("input '%s' source cannot be empty", input.ID)
+		}
+		// Check for duplicate input IDs
+		if availableInputs[input.ID] {
+			return fmt.Errorf("duplicate input ID: '%s'", input.ID)
+		}
+		availableInputs[input.ID] = true
+	}
+
+	// Validate operations and track outputs as new available inputs
+	for i, op := range js.Operations {
+		if op.Op == "" {
+			return fmt.Errorf("operation %d: operator name cannot be empty", i)
+		}
+
+		// Check single input reference
+		if op.Input != "" {
+			if !availableInputs[op.Input] {
+				return fmt.Errorf("operation %d (%s): input '%s' not found", i, op.Op, op.Input)
+			}
+		}
+
+		// Check multi-input references
+		for _, inputID := range op.Inputs {
+			if !availableInputs[inputID] {
+				return fmt.Errorf("operation %d (%s): input '%s' not found", i, op.Op, inputID)
+			}
+		}
+
+		// Add output as available input for subsequent operations
+		if op.Output != "" {
+			// Check for duplicate operation output IDs
+			if availableInputs[op.Output] {
+				return fmt.Errorf("operation %d (%s): duplicate output ID '%s'", i, op.Op, op.Output)
+			}
+			availableInputs[op.Output] = true
+		}
+	}
+
+	// Validate outputs
+	for i, output := range js.Outputs {
+		if output.ID == "" {
+			return fmt.Errorf("output %d: ID cannot be empty", i)
+		}
+		if output.Destination == "" {
+			return fmt.Errorf("output '%s': destination cannot be empty", output.ID)
+		}
+		// Check that output ID refers to something that was produced
+		if !availableInputs[output.ID] {
+			return fmt.Errorf("output '%s': refers to non-existent input/operation output", output.ID)
+		}
+	}
+
+	return nil
 }
