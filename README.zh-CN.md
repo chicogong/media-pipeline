@@ -289,18 +289,20 @@ media-pipeline/
 - **Planner** - DAG 构建与资源估算
 - **Executor** - FFmpeg 命令生成与执行
 - **Prober** - 媒体元数据提取
-- **Storage** - 统一文件抽象（本地、HTTP/HTTPS）🆕
+- **Storage** - 统一文件抽象（本地、HTTP/HTTPS、S3）🆕
 - **Validator** - 输入验证 + SSRF 防护 🆕
+- **Authentication** - JWT + API Key 与角色权限 🆕
 - **Store** - 内存任务存储
 - **API Server** - REST API 与实时进度
 - **Docker** - 多服务部署就绪
 
 **未来增强**：
-- 认证与授权（API 密钥、JWT、RBAC）
 - 更多算子（loudnorm、mix、concat、overlay）
-- 云存储（S3、GCS、Azure）
+- 云存储（GCS、Azure Blob）
 - 分布式 Worker 与任务队列
+- 高级 RBAC 策略
 - Prometheus 指标与分布式追踪
+- Webhook 通知
 
 ## 文档
 

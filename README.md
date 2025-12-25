@@ -274,6 +274,7 @@ media-pipeline/
 │   ├── storage/          # 🆕 Storage abstraction (local, HTTP/HTTPS)
 │   ├── compiler/
 │   │   └── validator/    # 🆕 Input validation + SSRF protection
+│   ├── auth/             # 🆕 JWT + API Key authentication
 │   ├── store/            # In-memory job storage (thread-safe)
 │   └── api/              # HTTP handlers and middleware
 └── docs/plans/           # Design documents
@@ -289,18 +290,20 @@ media-pipeline/
 - **Planner** - DAG builder with resource estimation
 - **Executor** - FFmpeg command generation & execution
 - **Prober** - Media metadata extraction via FFprobe
-- **Storage** - Unified file abstraction (local, HTTP/HTTPS) 🆕
+- **Storage** - Unified file abstraction (local, HTTP/HTTPS, S3) 🆕
 - **Validator** - Input validation + SSRF protection 🆕
+- **Authentication** - JWT + API Key with role-based access 🆕
 - **Store** - In-memory job storage
 - **API Server** - REST API with real-time progress
 - **Docker** - Multi-service deployment ready
 
 **Future Enhancements**:
-- Authentication & Authorization (API keys, JWT, RBAC)
 - More Operators (loudnorm, mix, concat, overlay)
-- Cloud Storage (S3, GCS, Azure)
+- Cloud Storage (GCS, Azure Blob)
 - Distributed Workers with job queue
+- Advanced RBAC policies
 - Prometheus metrics & distributed tracing
+- Webhook notifications
 
 ## Documentation
 

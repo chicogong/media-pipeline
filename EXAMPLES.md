@@ -6,6 +6,7 @@
 
 - [基础示例](#基础示例)
 - [API 认证](#api-认证)
+- [云存储 S3](#云存储-s3)
 - [视频处理](#视频处理)
 - [音频处理](#音频处理)
 - [批量处理](#批量处理)
@@ -723,6 +724,338 @@ curl -X POST http://localhost:8081/api/v1/jobs \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"spec": {...}}'
+```
+
+## 云存储 S3
+
+Media Pipeline 支持 Amazon S3 作为输入和输出存储。使用 `s3://` URI 格式访问 S3 对象。
+
+### 配置 AWS 凭证
+
+S3 存储使用 AWS SDK 的默认凭证链，支持以下方式：
+
+#### 1. 环境变量
+
+```bash
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=us-east-1
+```
+
+#### 2. AWS 配置文件
+
+```bash
+# ~/.aws/credentials
+[default]
+aws_access_key_id = your-access-key
+aws_secret_access_key = your-secret-key
+
+# ~/.aws/config
+[default]
+region = us-east-1
+```
+
+#### 3. IAM 角色（推荐用于 EC2/ECS）
+
+在 AWS EC2 或 ECS 上运行时，可以使用 IAM 角色自动获取凭证，无需手动配置。
+
+### S3 URI 格式
+
+```
+s3://bucket-name/path/to/file.mp4
+```
+
+- `bucket-name`: S3 存储桶名称
+- `path/to/file.mp4`: 对象键（Key）
+
+### 示例 1：从 S3 读取，输出到本地
+
+```bash
+curl -X POST http://localhost:8081/api/v1/jobs \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": {
+      "inputs": [
+        {
+          "id": "video",
+          "source": "s3://my-bucket/videos/input.mp4"
+        }
+      ],
+      "operations": [
+        {
+          "op": "trim",
+          "input": "video",
+          "output": "trimmed",
+          "params": {
+            "start": "00:00:10",
+            "duration": "00:01:00"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "trimmed",
+          "destination": "file:///output/trimmed.mp4"
+        }
+      ]
+    }
+  }'
+```
+
+### 示例 2：从本地读取，输出到 S3
+
+```bash
+curl -X POST http://localhost:8081/api/v1/jobs \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": {
+      "inputs": [
+        {
+          "id": "video",
+          "source": "file:///uploads/source.mp4"
+        }
+      ],
+      "operations": [
+        {
+          "op": "scale",
+          "input": "video",
+          "output": "scaled",
+          "params": {
+            "width": 1920,
+            "height": 1080
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "scaled",
+          "destination": "s3://my-bucket/processed/output-1080p.mp4",
+          "codec": {
+            "video": {
+              "codec": "libx264",
+              "preset": "medium",
+              "crf": 23
+            }
+          }
+        }
+      ]
+    }
+  }'
+```
+
+### 示例 3：S3 到 S3（完全云端处理）
+
+```bash
+curl -X POST http://localhost:8081/api/v1/jobs \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": {
+      "inputs": [
+        {
+          "id": "raw_video",
+          "source": "s3://source-bucket/raw/video.mp4"
+        }
+      ],
+      "operations": [
+        {
+          "op": "trim",
+          "input": "raw_video",
+          "output": "trimmed",
+          "params": {
+            "start": "00:05:00",
+            "duration": "00:10:00"
+          }
+        },
+        {
+          "op": "scale",
+          "input": "trimmed",
+          "output": "scaled",
+          "params": {
+            "width": 1280,
+            "height": 720
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "scaled",
+          "destination": "s3://processed-bucket/videos/final.mp4",
+          "codec": {
+            "video": {
+              "codec": "libx264",
+              "preset": "fast",
+              "crf": 23
+            },
+            "audio": {
+              "codec": "aac",
+              "bitrate": "128k"
+            }
+          }
+        }
+      ]
+    }
+  }'
+```
+
+### 示例 4：生成多个分辨率输出到 S3
+
+```bash
+curl -X POST http://localhost:8081/api/v1/jobs \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": {
+      "inputs": [
+        {
+          "id": "source",
+          "source": "s3://videos/source/original-4k.mp4"
+        }
+      ],
+      "operations": [
+        {
+          "op": "scale",
+          "input": "source",
+          "output": "hd",
+          "params": {"width": 1920, "height": 1080}
+        },
+        {
+          "op": "scale",
+          "input": "source",
+          "output": "sd",
+          "params": {"width": 1280, "height": 720}
+        },
+        {
+          "op": "scale",
+          "input": "source",
+          "output": "mobile",
+          "params": {"width": 640, "height": 360}
+        }
+      ],
+      "outputs": [
+        {
+          "id": "hd",
+          "destination": "s3://videos/transcoded/video-1080p.mp4"
+        },
+        {
+          "id": "sd",
+          "destination": "s3://videos/transcoded/video-720p.mp4"
+        },
+        {
+          "id": "mobile",
+          "destination": "s3://videos/transcoded/video-360p.mp4"
+        }
+      ]
+    }
+  }'
+```
+
+### Go 代码示例：使用 S3 存储
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "strings"
+
+    "your-project/pkg/storage"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建 S3 存储客户端
+    s3Storage, err := storage.NewS3Storage(ctx)
+    if err != nil {
+        panic(fmt.Sprintf("Failed to create S3 storage: %v", err))
+    }
+
+    // 检查文件是否存在
+    exists, err := s3Storage.Exists(ctx, "s3://my-bucket/videos/input.mp4")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("File exists: %v\n", exists)
+
+    // 下载文件
+    reader, err := s3Storage.Get(ctx, "s3://my-bucket/videos/input.mp4")
+    if err != nil {
+        panic(err)
+    }
+    defer reader.Close()
+
+    // 上传文件
+    data := strings.NewReader("Hello S3!")
+    err = s3Storage.Put(ctx, "s3://my-bucket/uploads/test.txt", data)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("File uploaded successfully")
+
+    // 删除文件
+    err = s3Storage.Delete(ctx, "s3://my-bucket/uploads/test.txt")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("File deleted successfully")
+}
+```
+
+### S3 权限要求
+
+确保你的 AWS 凭证具有以下权限：
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-bucket-name",
+        "arn:aws:s3:::your-bucket-name/*"
+      ]
+    }
+  ]
+}
+```
+
+### 最佳实践
+
+1. **使用 IAM 角色**: 在 AWS 环境中运行时，优先使用 IAM 角色而不是硬编码凭证
+2. **区域优化**: 将 Media Pipeline 部署在与 S3 存储桶相同的区域以降低延迟和成本
+3. **存储桶策略**: 配置适当的存储桶策略和 CORS 规则
+4. **版本控制**: 为重要的输出文件启用 S3 版本控制
+5. **生命周期策略**: 配置自动归档或删除旧文件以节省成本
+6. **传输加速**: 对于跨区域传输，考虑启用 S3 Transfer Acceleration
+
+### 故障排查
+
+```bash
+# 验证 AWS 凭证
+aws sts get-caller-identity
+
+# 列出存储桶内容
+aws s3 ls s3://your-bucket/
+
+# 测试上传
+echo "test" | aws s3 cp - s3://your-bucket/test.txt
+
+# 测试下载
+aws s3 cp s3://your-bucket/test.txt -
+
+# 检查存储桶权限
+aws s3api get-bucket-policy --bucket your-bucket
 ```
 
 ## 视频处理
