@@ -49,13 +49,13 @@ func TestHandleCreateJob(t *testing.T) {
 	reqBody := CreateJobRequest{
 		Spec: &schemas.JobSpec{
 			Inputs: []schemas.Input{
-				{ID: "input1", Source: "test.mp4"},
+				{ID: "input1", Source: "file://test.mp4"},
 			},
 			Operations: []schemas.Operation{
 				{Op: "trim", Input: "input1", Output: "trimmed"},
 			},
 			Outputs: []schemas.Output{
-				{ID: "trimmed", Destination: "output.mp4"},
+				{ID: "trimmed", Destination: "file://output.mp4"},
 			},
 		},
 	}

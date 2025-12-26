@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/chicogong/media-pipeline/pkg/compiler/validator"
 	"github.com/chicogong/media-pipeline/pkg/executor"
 	"github.com/chicogong/media-pipeline/pkg/operators"
 	"github.com/chicogong/media-pipeline/pkg/planner"
@@ -19,20 +20,22 @@ import (
 
 // Server holds the API server dependencies
 type Server struct {
-	store    store.Store
-	prober   *prober.Prober
-	planner  *planner.Planner
-	executor *executor.Executor
+	store     store.Store
+	prober    *prober.Prober
+	planner   *planner.Planner
+	executor  *executor.Executor
+	validator *validator.Validator
 }
 
 // NewServer creates a new API server
 func NewServer(s store.Store) *Server {
 	registry := operators.GlobalRegistry()
 	return &Server{
-		store:    s,
-		prober:   prober.NewProber(),
-		planner:  planner.NewPlanner(),
-		executor: executor.NewExecutor(registry),
+		store:     s,
+		prober:    prober.NewProber(),
+		planner:   planner.NewPlanner(),
+		executor:  executor.NewExecutor(registry),
+		validator: &validator.Validator{},
 	}
 }
 
@@ -71,6 +74,12 @@ func (s *Server) HandleCreateJob(w http.ResponseWriter, r *http.Request) {
 
 	if req.Spec == nil {
 		s.sendError(w, http.StatusBadRequest, "missing_spec", "Job specification is required")
+		return
+	}
+
+	// Validate JobSpec
+	if err := s.validator.Validate(req.Spec); err != nil {
+		s.sendError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Invalid job specification: %v", err))
 		return
 	}
 

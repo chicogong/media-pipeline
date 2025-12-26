@@ -13,6 +13,13 @@ services:
     environment:
       - API_HOST=0.0.0.0
       - API_PORT=8080
+      # Authentication settings
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - AUTH_MODE=${AUTH_MODE:-optional}
+      # AWS credentials for S3 (optional)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
       # Redis connection (for future use)
       - REDIS_URL=redis://redis:6379
       # PostgreSQL connection (for future use)

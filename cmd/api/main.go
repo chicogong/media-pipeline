@@ -13,16 +13,57 @@ import (
 	"time"
 
 	"github.com/chicogong/media-pipeline/pkg/api"
+	"github.com/chicogong/media-pipeline/pkg/auth"
 	"github.com/chicogong/media-pipeline/pkg/store"
 )
 
 var (
-	port = flag.Int("port", 8080, "Server port")
-	host = flag.String("host", "0.0.0.0", "Server host")
+	port      = flag.Int("port", 8080, "Server port")
+	host      = flag.String("host", "0.0.0.0", "Server host")
+	jwtSecret = flag.String("jwt-secret", getEnv("JWT_SECRET", ""), "JWT secret key")
+	authMode  = flag.String("auth-mode", getEnv("AUTH_MODE", "optional"), "Authentication mode: required or optional")
 )
+
+// getEnv gets environment variable with default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func main() {
 	flag.Parse()
+
+	// Validate JWT secret if auth is required
+	if *authMode == "required" && *jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required when AUTH_MODE=required")
+	}
+
+	// Create authentication managers
+	var jwtManager *auth.JWTManager
+	var apiKeyManager *auth.APIKeyManager
+
+	if *jwtSecret != "" {
+		log.Println("Initializing JWT authentication...")
+		jwtManager = auth.NewJWTManager(*jwtSecret, 24*time.Hour)
+	}
+
+	log.Println("Initializing API Key authentication...")
+	apiKeyManager = auth.NewAPIKeyManager()
+
+	// Create auth middleware
+	authRequired := (*authMode == "required")
+	var authMiddleware *auth.AuthMiddleware
+
+	if jwtManager != nil || apiKeyManager != nil {
+		authMiddleware = auth.NewAuthMiddleware(jwtManager, apiKeyManager, !authRequired)
+		if authRequired {
+			log.Println("Authentication: REQUIRED")
+		} else {
+			log.Println("Authentication: OPTIONAL")
+		}
+	}
 
 	// Create store
 	log.Println("Initializing store...")
@@ -35,7 +76,7 @@ func main() {
 	defer server.Close()
 
 	// Setup HTTP router
-	mux := setupRoutes(server)
+	mux := setupRoutes(server, authMiddleware)
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", *host, *port)
@@ -73,32 +114,61 @@ func main() {
 	log.Println("Server stopped")
 }
 
-func setupRoutes(server *api.Server) *http.ServeMux {
+func setupRoutes(server *api.Server, authMiddleware *auth.AuthMiddleware) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Health check
+	// Health check (no auth required)
 	mux.HandleFunc("/health", api.Chain(
 		server.HandleHealth,
 		api.LoggingMiddleware,
 	))
 
-	// API routes
-	mux.HandleFunc("/api/v1/jobs", api.Chain(
-		handleJobsRoute(server),
-		api.RecoveryMiddleware,
-		api.CORSMiddleware,
-		api.LoggingMiddleware,
-	))
+	// API routes with authentication
+	if authMiddleware != nil {
+		// Authenticated job routes
+		mux.HandleFunc("/api/v1/jobs", api.Chain(
+			handleJobsRoute(server),
+			wrapAuthMiddleware(authMiddleware),
+			api.RecoveryMiddleware,
+			api.CORSMiddleware,
+			api.LoggingMiddleware,
+		))
 
-	// Job detail route
-	mux.HandleFunc("/api/v1/jobs/", api.Chain(
-		handleJobDetailRoute(server),
-		api.RecoveryMiddleware,
-		api.CORSMiddleware,
-		api.LoggingMiddleware,
-	))
+		// Authenticated job detail route
+		mux.HandleFunc("/api/v1/jobs/", api.Chain(
+			handleJobDetailRoute(server),
+			wrapAuthMiddleware(authMiddleware),
+			api.RecoveryMiddleware,
+			api.CORSMiddleware,
+			api.LoggingMiddleware,
+		))
+	} else {
+		// No authentication
+		mux.HandleFunc("/api/v1/jobs", api.Chain(
+			handleJobsRoute(server),
+			api.RecoveryMiddleware,
+			api.CORSMiddleware,
+			api.LoggingMiddleware,
+		))
+
+		mux.HandleFunc("/api/v1/jobs/", api.Chain(
+			handleJobDetailRoute(server),
+			api.RecoveryMiddleware,
+			api.CORSMiddleware,
+			api.LoggingMiddleware,
+		))
+	}
 
 	return mux
+}
+
+// wrapAuthMiddleware adapts auth.AuthMiddleware to work with api.Chain
+func wrapAuthMiddleware(authMiddleware *auth.AuthMiddleware) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			authMiddleware.Handler(next).ServeHTTP(w, r)
+		}
+	}
 }
 
 // handleJobsRoute handles /api/v1/jobs (list and create)
