@@ -271,7 +271,7 @@ media-pipeline/
 │   ├── planner/          # DAG builder and resource estimator
 │   ├── executor/         # FFmpeg command builder and runner
 │   ├── prober/           # FFprobe media metadata extraction
-│   ├── storage/          # 🆕 Storage abstraction (local, HTTP/HTTPS)
+│   ├── storage/          # 🆕 Storage abstraction (local, HTTP/HTTPS, S3)
 │   ├── compiler/
 │   │   └── validator/    # 🆕 Input validation + SSRF protection
 │   ├── auth/             # 🆕 JWT + API Key authentication

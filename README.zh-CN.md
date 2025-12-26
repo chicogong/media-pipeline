@@ -271,7 +271,7 @@ media-pipeline/
 │   ├── planner/          # DAG 构建与资源估算
 │   ├── executor/         # FFmpeg 命令构建与执行
 │   ├── prober/           # FFprobe 媒体元数据提取
-│   ├── storage/          # 🆕 存储抽象（本地、HTTP/HTTPS）
+│   ├── storage/          # 🆕 存储抽象（本地、HTTP/HTTPS、S3）
 │   ├── compiler/
 │   │   └── validator/    # 🆕 输入验证 + SSRF 防护
 │   ├── store/            # 内存任务存储（线程安全）
