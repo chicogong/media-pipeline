@@ -3,6 +3,7 @@ package builtin
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chicogong/media-pipeline/pkg/operators"
 	"github.com/chicogong/media-pipeline/pkg/schemas"
@@ -75,3 +76,77 @@ func TestScaleOperator_Compile_UsesLabelsDirectly(t *testing.T) {
 	}
 }
 
+func TestScaleOperator_Category(t *testing.T) {
+	op := &ScaleOperator{}
+	if got := op.Category(); got != operators.CategoryVideo {
+		t.Fatalf("Category() = %q, want %q", got, operators.CategoryVideo)
+	}
+}
+
+func TestScaleOperator_EstimateResources_Basic(t *testing.T) {
+	op := &ScaleOperator{}
+
+	input := &schemas.MediaInfo{
+		Format: schemas.FormatInfo{
+			Duration: 60 * time.Second,
+			BitRate:  8_000_000, // 8 Mbps
+		},
+		VideoStreams: []schemas.VideoStream{
+			{Width: 1920, Height: 1080, FrameRate: 30},
+		},
+	}
+
+	est, err := op.EstimateResources(
+		map[string]interface{}{"width": 1280, "height": 720},
+		[]*schemas.MediaInfo{input},
+	)
+	if err != nil {
+		t.Fatalf("EstimateResources failed: %v", err)
+	}
+	if est == nil {
+		t.Fatal("EstimateResources returned nil estimates")
+	}
+	if est.Duration <= 0 {
+		t.Fatalf("expected positive Duration, got %v", est.Duration)
+	}
+	if est.MemoryMB <= 0 {
+		t.Fatalf("expected positive MemoryMB, got %d", est.MemoryMB)
+	}
+}
+
+func TestScaleOperator_EstimateResources_DefaultBitrate(t *testing.T) {
+	// BitRate == 0 triggers the default 5 Mbps fallback path
+	op := &ScaleOperator{}
+
+	input := &schemas.MediaInfo{
+		Format: schemas.FormatInfo{
+			Duration: 30 * time.Second,
+			BitRate:  0,
+		},
+		VideoStreams: []schemas.VideoStream{
+			{Width: 1280, Height: 720, FrameRate: 25},
+		},
+	}
+
+	est, err := op.EstimateResources(
+		map[string]interface{}{"width": 640, "height": 360},
+		[]*schemas.MediaInfo{input},
+	)
+	if err != nil {
+		t.Fatalf("EstimateResources failed: %v", err)
+	}
+	if est == nil {
+		t.Fatal("EstimateResources returned nil estimates")
+	}
+	if est.MemoryMB != 200 {
+		t.Fatalf("expected MemoryMB=200, got %d", est.MemoryMB)
+	}
+}
+
+func TestScaleOperator_EstimateResources_NoInputs(t *testing.T) {
+	op := &ScaleOperator{}
+	_, err := op.EstimateResources(map[string]interface{}{"width": 1280, "height": 720}, nil)
+	if err == nil {
+		t.Fatal("expected error for empty inputs, got nil")
+	}
+}

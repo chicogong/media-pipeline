@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Compiled API server binary (output of `go build ./cmd/api`)
+/api
+
 # Test binary, built with `go test -c`
 *.test
 
