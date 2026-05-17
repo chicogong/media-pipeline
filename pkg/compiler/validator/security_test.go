@@ -42,8 +42,10 @@ func TestValidateHTTPURI(t *testing.T) {
 		wantErr bool
 		errMsg  string
 	}{
-		{"https://example.com/video.mp4", false, ""},
-		{"http://google.com/file.mp4", false, ""},
+		// Public IPs are allowed. IP literals are used so the test stays
+		// offline: net.LookupIP resolves IP literals directly without DNS.
+		{"https://8.8.8.8/video.mp4", false, ""},
+		{"http://1.1.1.1/file.mp4", false, ""},
 		{"https://127.0.0.1/video.mp4", true, "localhost"},
 		{"http://10.0.0.1/internal.mp4", true, "private network"},
 		{"https://192.168.1.1/file.mp4", true, "private network"},
