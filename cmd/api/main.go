@@ -15,6 +15,10 @@ import (
 	"github.com/chicogong/media-pipeline/pkg/api"
 	"github.com/chicogong/media-pipeline/pkg/auth"
 	"github.com/chicogong/media-pipeline/pkg/store"
+
+	// Register the builtin operators (trim, scale) via their init() functions
+	// so the planner can resolve them when processing submitted jobs.
+	_ "github.com/chicogong/media-pipeline/pkg/operators/builtin"
 )
 
 var (
