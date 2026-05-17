@@ -50,9 +50,9 @@ type OperatorDescriptor struct {
 	Parameters []ParameterDescriptor
 
 	// Input requirements
-	MinInputs   int
-	MaxInputs   int
-	InputTypes  []MediaType
+	MinInputs  int
+	MaxInputs  int
+	InputTypes []MediaType
 
 	// Output types
 	OutputTypes []MediaType
@@ -76,8 +76,14 @@ const (
 // CompileContext contains context for compilation
 type CompileContext struct {
 	// Inputs
-	InputStreams  []StreamRef
-	Params        map[string]interface{}
+	InputStreams []StreamRef
+	Params       map[string]interface{}
+
+	// OutputPrefix is a unique token the builder assigns per operation node.
+	// Operators must embed it in their filtergraph output labels (e.g.
+	// "[v"+OutputPrefix+"]") so that chained operations do not collide on
+	// label names. When empty, operators emit bare "[v]"/"[a]" labels.
+	OutputPrefix string
 
 	// Environment
 	WorkDir string
@@ -118,7 +124,7 @@ type CompileResult struct {
 
 // Command represents an FFmpeg command
 type Command struct {
-	Stage   string   // "probe", "loudnorm_pass1", "main"
+	Stage   string // "probe", "loudnorm_pass1", "main"
 	Args    []string
 	Stdin   string
 	WorkDir string

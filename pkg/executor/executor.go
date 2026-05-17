@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chicogong/media-pipeline/pkg/operators"
+	"github.com/chicogong/media-pipeline/pkg/prober"
 	"github.com/chicogong/media-pipeline/pkg/schemas"
 	"github.com/chicogong/media-pipeline/pkg/storage"
 )
@@ -20,6 +21,7 @@ type Executor struct {
 	builder        *CommandBuilder
 	parser         *ProgressParser
 	storageManager *StorageManager
+	prober         *prober.Prober
 }
 
 // NewExecutor creates a new executor
@@ -28,6 +30,7 @@ func NewExecutor(registry *operators.Registry) *Executor {
 		builder:        NewCommandBuilder(registry),
 		parser:         NewProgressParser(),
 		storageManager: NewStorageManager(),
+		prober:         prober.NewProber(),
 	}
 }
 
@@ -66,7 +69,7 @@ func (e *Executor) Execute(ctx context.Context, plan *schemas.ProcessingPlan, op
 	}
 
 	// Prepare outputs: generate local temp paths and store original destinations
-	outputFiles := make(map[string]string) // node.ID -> local temp path
+	outputFiles := make(map[string]string)  // node.ID -> local temp path
 	origDestURIs := make(map[string]string) // node.ID -> original destination URI
 
 	for _, node := range plan.Nodes {
@@ -105,6 +108,14 @@ func (e *Executor) Execute(ctx context.Context, plan *schemas.ProcessingPlan, op
 			if localPath, ok := inputMap[nodeCopy.SourceURI]; ok {
 				nodeCopy.SourceURI = localPath
 			}
+			// Probe the local input so the builder knows which streams
+			// actually exist. Probe failures are non-fatal: the builder
+			// falls back to assuming both a video and an audio stream.
+			if nodeCopy.Metadata == nil {
+				if info, err := e.prober.Probe(ctx, nodeCopy.SourceURI); err == nil {
+					nodeCopy.Metadata = info
+				}
+			}
 		} else if nodeCopy.Type == "output" {
 			// Replace destination URI with local temp path
 			if localPath, ok := outputFiles[nodeCopy.ID]; ok {
@@ -115,16 +126,16 @@ func (e *Executor) Execute(ctx context.Context, plan *schemas.ProcessingPlan, op
 	}
 	// Create a plan copy with modified nodes
 	planCopy := &schemas.ProcessingPlan{
-		PlanID:          plan.PlanID,
-		JobID:           plan.JobID,
-		CreatedAt:       plan.CreatedAt,
-		Nodes:           nodesCopy,
-		Edges:           plan.Edges,
-		ExecutionOrder:  plan.ExecutionOrder,
-		ExecutionStages: plan.ExecutionStages,
+		PlanID:           plan.PlanID,
+		JobID:            plan.JobID,
+		CreatedAt:        plan.CreatedAt,
+		Nodes:            nodesCopy,
+		Edges:            plan.Edges,
+		ExecutionOrder:   plan.ExecutionOrder,
+		ExecutionStages:  plan.ExecutionStages,
 		ResourceEstimate: plan.ResourceEstimate,
-		FFmpegVersion:   plan.FFmpegVersion,
-		Commands:        plan.Commands,
+		FFmpegVersion:    plan.FFmpegVersion,
+		Commands:         plan.Commands,
 	}
 
 	// Build FFmpeg command using the modified plan

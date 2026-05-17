@@ -39,16 +39,14 @@ func (cb *CommandBuilder) Build(ctx context.Context, plan *schemas.ProcessingPla
 	filterExprs := []string{}
 	streamLabels := make(map[string][]string) // node ID -> output labels
 
-	// Initialize input stream labels
+	// Initialize input stream labels from probed metadata when available so
+	// operators only see streams that actually exist in the input file.
 	for i, input := range inputs {
-		// Input streams from FFmpeg are [0:v], [0:a], [1:v], [1:a], etc.
-		streamLabels[input.nodeID] = []string{
-			fmt.Sprintf("[%d:v]", i),
-			fmt.Sprintf("[%d:a]", i),
-		}
+		streamLabels[input.nodeID] = cb.inputStreamLabels(plan, input.nodeID, i)
 	}
 
 	// Process nodes in execution order
+	opIndex := 0
 	for _, nodeID := range plan.ExecutionOrder {
 		node := cb.getNode(plan, nodeID)
 		if node == nil {
@@ -66,8 +64,10 @@ func (cb *CommandBuilder) Build(ctx context.Context, plan *schemas.ProcessingPla
 			return nil, fmt.Errorf("node %s: operator %s not found: %w", nodeID, node.Operator, err)
 		}
 
-		// Build compile context
-		compileCtx := cb.buildCompileContext(plan, node, streamLabels)
+		// Build compile context with a label prefix unique to this operation
+		// so chained operators do not collide on filtergraph label names.
+		compileCtx := cb.buildCompileContext(plan, node, streamLabels, fmt.Sprintf("f%d", opIndex))
+		opIndex++
 
 		// Compile operator
 		result, err := op.Compile(compileCtx)
@@ -107,7 +107,7 @@ func (cb *CommandBuilder) Build(ctx context.Context, plan *schemas.ProcessingPla
 		if labels, ok := streamLabels[output.sourceNodeID]; ok && len(labels) > 0 {
 			// Use the output labels from the last operation
 			for _, label := range labels {
-				args = append(args, "-map", label)
+				args = append(args, "-map", toMapArg(label))
 			}
 		}
 
@@ -188,7 +188,7 @@ func (cb *CommandBuilder) getNode(plan *schemas.ProcessingPlan, nodeID string) *
 }
 
 // buildCompileContext creates a compile context for an operator
-func (cb *CommandBuilder) buildCompileContext(plan *schemas.ProcessingPlan, node *schemas.PlanNode, streamLabels map[string][]string) *operators.CompileContext {
+func (cb *CommandBuilder) buildCompileContext(plan *schemas.ProcessingPlan, node *schemas.PlanNode, streamLabels map[string][]string, outputPrefix string) *operators.CompileContext {
 	// Find input streams
 	inputStreams := []operators.StreamRef{}
 	for _, edge := range plan.Edges {
@@ -222,6 +222,7 @@ func (cb *CommandBuilder) buildCompileContext(plan *schemas.ProcessingPlan, node
 		InputStreams:  inputStreams,
 		Params:        node.Params,
 		InputMetadata: inputMetadata,
+		OutputPrefix:  outputPrefix,
 	}
 }
 
@@ -234,4 +235,47 @@ func (cb *CommandBuilder) inferStreamType(label string) string {
 		return "audio"
 	}
 	return "both"
+}
+
+// inputStreamLabels returns the FFmpeg stream labels for an input node. When
+// the node carries probed metadata, only the streams that actually exist are
+// declared; otherwise it falls back to assuming both video and audio.
+func (cb *CommandBuilder) inputStreamLabels(plan *schemas.ProcessingPlan, nodeID string, index int) []string {
+	if node := cb.getNode(plan, nodeID); node != nil && node.Metadata != nil {
+		labels := []string{}
+		if len(node.Metadata.VideoStreams) > 0 {
+			labels = append(labels, fmt.Sprintf("[%d:v]", index))
+		}
+		if len(node.Metadata.AudioStreams) > 0 {
+			labels = append(labels, fmt.Sprintf("[%d:a]", index))
+		}
+		if len(labels) > 0 {
+			return labels
+		}
+	}
+	// No usable metadata: assume the input has both a video and an audio stream.
+	return []string{
+		fmt.Sprintf("[%d:v]", index),
+		fmt.Sprintf("[%d:a]", index),
+	}
+}
+
+// toMapArg converts a stream label into an FFmpeg -map argument. Raw input
+// stream references like "[0:a]" must be mapped without brackets ("0:a");
+// filtergraph output labels keep their brackets.
+func toMapArg(label string) string {
+	inner := strings.TrimSuffix(strings.TrimPrefix(label, "["), "]")
+	if colon := strings.IndexByte(inner, ':'); colon > 0 {
+		isInputRef := true
+		for _, c := range inner[:colon] {
+			if c < '0' || c > '9' {
+				isInputRef = false
+				break
+			}
+		}
+		if isInputRef {
+			return inner
+		}
+	}
+	return label
 }

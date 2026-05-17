@@ -70,7 +70,7 @@ func ExampleExecutor() {
 	fmt.Printf("Command: %s\n", cmd.Args[0])
 
 	// Output:
-	// FFmpeg command built with 8 arguments
+	// FFmpeg command built with 10 arguments
 	// Command: ffmpeg
 }
 

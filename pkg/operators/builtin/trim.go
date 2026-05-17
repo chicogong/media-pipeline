@@ -172,6 +172,9 @@ func (o *TrimOperator) Compile(ctx *operators.CompileContext) (*operators.Compil
 		return nil, fmt.Errorf("trim requires at least one input stream")
 	}
 
+	videoOutLabel := "[v" + ctx.OutputPrefix + "]"
+	audioOutLabel := "[a" + ctx.OutputPrefix + "]"
+
 	var filterVideo, filterAudio string
 
 	if duration, ok := ctx.Params["duration"]; ok {
@@ -182,21 +185,21 @@ func (o *TrimOperator) Compile(ctx *operators.CompileContext) (*operators.Compil
 		durationValue := d.(time.Duration)
 
 		if videoInputLabel != "" {
-			filterVideo = fmt.Sprintf("%strim=start=%.3f:duration=%.3f[v]",
-				videoInputLabel, startDuration.Seconds(), durationValue.Seconds())
+			filterVideo = fmt.Sprintf("%strim=start=%.3f:duration=%.3f%s",
+				videoInputLabel, startDuration.Seconds(), durationValue.Seconds(), videoOutLabel)
 		}
 		if audioInputLabel != "" {
-			filterAudio = fmt.Sprintf("%satrim=start=%.3f:duration=%.3f[a]",
-				audioInputLabel, startDuration.Seconds(), durationValue.Seconds())
+			filterAudio = fmt.Sprintf("%satrim=start=%.3f:duration=%.3f%s",
+				audioInputLabel, startDuration.Seconds(), durationValue.Seconds(), audioOutLabel)
 		}
 	} else {
 		if videoInputLabel != "" {
-			filterVideo = fmt.Sprintf("%strim=start=%.3f[v]",
-				videoInputLabel, startDuration.Seconds())
+			filterVideo = fmt.Sprintf("%strim=start=%.3f%s",
+				videoInputLabel, startDuration.Seconds(), videoOutLabel)
 		}
 		if audioInputLabel != "" {
-			filterAudio = fmt.Sprintf("%satrim=start=%.3f[a]",
-				audioInputLabel, startDuration.Seconds())
+			filterAudio = fmt.Sprintf("%satrim=start=%.3f%s",
+				audioInputLabel, startDuration.Seconds(), audioOutLabel)
 		}
 	}
 
@@ -205,14 +208,14 @@ func (o *TrimOperator) Compile(ctx *operators.CompileContext) (*operators.Compil
 
 	if filterVideo != "" {
 		filterExpression = filterVideo
-		outputLabels = append(outputLabels, "[v]")
+		outputLabels = append(outputLabels, videoOutLabel)
 	}
 	if filterAudio != "" {
 		if filterExpression != "" {
 			filterExpression += ";"
 		}
 		filterExpression += filterAudio
-		outputLabels = append(outputLabels, "[a]")
+		outputLabels = append(outputLabels, audioOutLabel)
 	}
 
 	return &operators.CompileResult{
