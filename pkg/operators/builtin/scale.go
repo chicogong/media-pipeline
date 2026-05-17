@@ -141,7 +141,7 @@ func (o *ScaleOperator) EstimateResources(
 
 	return &schemas.NodeEstimates{
 		Duration: cpuTime,
-		MemoryMB: 200,  // 200MB
+		MemoryMB: 200, // 200MB
 		DiskMB:   int64(bitrate * int64(duration.Seconds()) / 8 / 1024 / 1024),
 	}, nil
 }
@@ -166,25 +166,32 @@ func (o *ScaleOperator) Compile(ctx *operators.CompileContext) (*operators.Compi
 	}[algorithm]
 
 	var inputLabel string
+	var passThrough []string
 	for _, stream := range ctx.InputStreams {
-		if stream.StreamType == "video" {
+		if stream.StreamType == "video" && inputLabel == "" {
 			inputLabel = stream.Label
-			break
+		} else {
+			// Streams scale does not transform (audio, etc.) are carried
+			// through unchanged so they still reach the output.
+			passThrough = append(passThrough, stream.Label)
 		}
 	}
-	if inputLabel == "" && len(ctx.InputStreams) > 0 {
-		inputLabel = ctx.InputStreams[0].Label
+	if inputLabel == "" && len(passThrough) > 0 {
+		// No stream was explicitly typed as video; treat the first input as it.
+		inputLabel = passThrough[0]
+		passThrough = passThrough[1:]
 	}
 	if inputLabel == "" {
 		return nil, fmt.Errorf("scale requires a video input stream")
 	}
 
-	filter := fmt.Sprintf("%sscale=%d:%d:flags=%s[v]",
-		inputLabel, width.(int), height.(int), algorithmFlag)
+	outputLabel := "[v" + ctx.OutputPrefix + "]"
+	filter := fmt.Sprintf("%sscale=%d:%d:flags=%s%s",
+		inputLabel, width.(int), height.(int), algorithmFlag, outputLabel)
 
 	return &operators.CompileResult{
 		FilterExpression: filter,
-		OutputLabels:     []string{"[v]"},
+		OutputLabels:     append([]string{outputLabel}, passThrough...),
 	}, nil
 }
 

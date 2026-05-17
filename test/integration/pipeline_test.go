@@ -237,18 +237,8 @@ func TestIntegration_FullJobLifecycle(t *testing.T) {
 }
 
 // TestIntegration_MultiOperationJob submits a job that chains two operations
-// (trim then scale) through the full pipeline.
-//
-// Skipped: this exposes a known bug in the executor's command builder. Every
-// operator emits hardcoded [v]/[a] filter labels, so chained operations
-// collide (".. .[v]; ...[v]"); and the builder assumes every input has both a
-// [0:v] and [0:a] stream, so trim references a [0:a] stream that a video-only
-// input does not have. Single-operation jobs work — see
-// TestIntegration_FullJobLifecycle. Remove the t.Skip once the builder probes
-// real input streams and allocates unique per-operation stream labels.
+// (trim then scale) and verifies the full pipeline completes.
 func TestIntegration_MultiOperationJob(t *testing.T) {
-	t.Skip("known bug: chained operations collide on hardcoded [v]/[a] filter labels")
-
 	ffmpeg := requireFFmpeg(t)
 	ts := newPipelineServer(t)
 
